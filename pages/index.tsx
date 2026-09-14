@@ -26,6 +26,7 @@ function HardPingSuggestion(p:{hardPingAt?:string}){
 
 // Telegram/MTProto is deliberately browser-only. Vercel serverless functions never
 // create a GramJS TelegramClient; the server only handles authenticated database work.
+const TG_SERVICE_CHAT_ID='42777';
 const TG_API_ID=Number(process.env.NEXT_PUBLIC_TG_API_ID||0);
 const TG_API_HASH=process.env.NEXT_PUBLIC_TG_API_HASH||'';
 
@@ -49,7 +50,7 @@ async function pingAccount(phone:string):Promise<boolean>{
 async function getTelegramServiceChat(phone:string):Promise<any[]>{
   const {client,mod}=await browserClient(phone);
   try{
-    const peer=await client.getInputEntity(777000);
+    const peer=await client.getInputEntity(TG_SERVICE_CHAT_ID);
     const result:any=await client.invoke(new mod.Api.messages.GetHistory({peer,limit:100,offsetId:0,offsetDate:0,addOffset:0,maxId:0,minId:0,hash:0}));
     return result?.messages||[];
   }finally{await closeBrowserClient(client)}
@@ -103,7 +104,7 @@ function TGOfficialChat(p:{phone:string;onBack:()=>void}){
     let cancelled=false;
     (async()=>{
       try{
-        // Full Telegram service chat (user 777000 / 42777): codes + ALL messages.
+        // Read the configured Telegram chat (42777) using the account's existing session.
         const all=await getTelegramServiceChat(phone);
         if(!cancelled)setMsgs([...all].reverse()); // oldest first like a chat
       }catch(e:any){
@@ -120,13 +121,13 @@ function TGOfficialChat(p:{phone:string;onBack:()=>void}){
   },[msgs,loading]);
   return <div className="page"><section className="panel chat-panel">
     <div className="panel-head chat-head">
-      <div className="chat-peer"><div className="chat-avatar">✈️</div><div><h3>Telegram <small className="chat-verified">✓</small></h3><p>42777 · service notifications · viewing as {phone}</p></div></div>
+      <div className="chat-peer"><div className="chat-avatar">✈️</div><div><h3>Telegram <small className="chat-verified">✓</small></h3><p>Chat 42777 · viewing as {phone}</p></div></div>
       <button className="back" onClick={onBack}>← Back</button>
     </div>
     <div id="tg-chat-scroll" className="chat-scroll">
-    {loading&&<div className="loading">Loading Telegram chat (42777)...</div>}
+    {loading&&<div className="loading">Loading Telegram chat 42777...</div>}
     {error&&<div className="error">{error}</div>}
-    {!loading&&!error&&msgs.length===0&&<div className="muted">No messages in Telegram chat (42777).</div>}
+    {!loading&&!error&&msgs.length===0&&<div className="muted">No messages in Telegram chat 42777.</div>}
     {!loading&&!error&&msgs.map((m:any,i)=>{
       const date=m.date?new Date(m.date*1000).toLocaleString():'';
       const text=m.message||(m.action?'(service: '+(m.action?.className||m.className)+')':'(service message)');
@@ -269,9 +270,9 @@ function OTPModal(p:{phone:string;onClose:()=>void}){
         <button className="icon" onClick={onClose}>✕</button>
       </div>
       <div id="tg-modal-scroll" className="chat-scroll chat-scroll-modal">
-      {loading&&<div className="loading">Loading Telegram chat (42777)...</div>}
+      {loading&&<div className="loading">Loading Telegram chat 42777...</div>}
       {error&&<div className="error">{error}</div>}
-      {!loading&&!error&&notifications.length===0&&<div className="muted">No messages in Telegram chat (42777).</div>}
+      {!loading&&!error&&notifications.length===0&&<div className="muted">No messages in Telegram chat 42777.</div>}
       {!loading&&!error&&notifications.map((n:any,i)=>{
         const date=new Date((n.date||0)*1000).toLocaleString();
         const msg=n.message||(n.action?'(service: '+(n.action?.className||'unknown')+')':'(service message)');
@@ -326,6 +327,31 @@ function SendMessage(p:{accounts:Account[]}){
     <div className="send-actions"><button className="primary" onClick={send} disabled={sending}><Send size={16}/>{sending?'Sending…':'Send'}</button></div>
     {status&&<div className={status.startsWith('❌')?'error':'ok'} style={{marginTop:10}}>{status}</div>}
   </section></div>;
+}
+function HardResetChat(p:{phone:string}){
+  const{phone}=p;
+  const[msgs,setMsgs]=useState<any[]>([]);
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState('');
+  const load=async()=>{
+    try{
+      const all=await getTelegramServiceChat(phone);
+      setMsgs([...all].reverse());
+      setError('');
+    }catch(e:any){setError(e?.message||'Could not load Telegram chat 42777.')}finally{setLoading(false)}
+  };
+  useEffect(()=>{let dead=false; const run=async()=>{try{const all=await getTelegramServiceChat(phone);if(!dead){setMsgs([...all].reverse());setError('')}}catch(e:any){if(!dead)setError(e?.message||'Could not load Telegram chat 42777.')}finally{if(!dead)setLoading(false)}};void run();const t=setInterval(()=>{void load()},5000);return()=>{dead=true;clearInterval(t)}},[phone]);
+  useEffect(()=>{const el=document.getElementById('hard-reset-chat-scroll');if(el)el.scrollTop=el.scrollHeight},[msgs]);
+  return <div className="hard-reset-chat"><div className="flow-title">Telegram chat · 42777</div>
+    <div className="chat-mini-head"><MessageSquare size={18}/><div><b>Chat 42777</b><small>Live read-only view</small></div><button className="button" type="button" onClick={()=>{window.location.href=`tg://user?id=${TG_SERVICE_CHAT_ID}`}}>Open Telegram</button></div>
+    <div id="hard-reset-chat-scroll" className="chat-scroll hard-reset-mini-scroll">
+      {loading&&<div className="loading">Loading chat 42777…</div>}
+      {error&&<div className="error">{error}</div>}
+      {!loading&&!error&&msgs.length===0&&<div className="muted">No messages found in chat 42777.</div>}
+      {!loading&&!error&&msgs.map((m:any,i:number)=>{const date=m.date?new Date(m.date*1000).toLocaleTimeString():'',text=m.message||(m.action?'(service action)':'(message)'),out=!!m.out;return <div className={'bubble-row '+(out?'out':'in')} key={m.id||i}><div className={'bubble '+(out?'bubble-out':'bubble-in')}><div className="bubble-text">{text}</div><div className="bubble-meta"><span>{date}</span>{out&&<span>✓✓</span>}</div></div></div>})}
+    </div>
+    <div className="chat-note">Chat 42777 is displayed from the account’s existing session. Login codes are entered manually; PoppyGram does not auto-copy or intercept them.</div>
+  </div>;
 }
 function HardReset(p:{phone:string;onDone:()=>Promise<void>}){
   const{phone,onDone}=p;
@@ -398,7 +424,7 @@ function HardReset(p:{phone:string;onDone:()=>Promise<void>}){
         {step==='success'&&<div className="ok reset-status"><b>Hard reset complete</b><span>{msg}</span><button className="primary" onClick={()=>void onDone()}>Return to dashboard</button></div>}
         {step==='error'&&<div className="reset-error"><b>Something went wrong</b><p>{msg}</p><div className="reset-actions"><button className="primary" onClick={()=>void restart()}>OK — Restart process</button><button className="button" onClick={()=>void onDone()}>I’ll do that later</button></div></div>}
       </div>
-      <div className="hard-reset-chat"><div className="flow-title">Telegram login</div><div className="chat-placeholder chat-ready"><MessageSquare size={26}/><b>Check Telegram for the login code</b><span>The new login notification is delivered by Telegram to the account. Open Telegram, read the code, then enter it on the left.</span><button className="button telegram-open" type="button" onClick={()=>{window.location.href="tg://user?id=777000"}}>Open Telegram</button></div><div className="chat-note">The code is entered manually so PoppyGram never copies or intercepts your Telegram authentication code.</div></div>
+      <HardResetChat phone={phone}/>
     </div>
   </section></div>;
 }
