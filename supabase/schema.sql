@@ -40,7 +40,7 @@ create table if not exists processed_updates(
 create index if not exists processed_updates_created_idx on processed_updates(created_at desc);
 
 create table if not exists settings(key text primary key,value text not null,updated_at timestamptz not null default now());
-insert into settings(key,value) values('site_name','PoppyGram'),('ping_interval_minutes','60'),('max_attempts','3'),('global_credit','100') on conflict(key) do nothing;
+insert into settings(key,value) values('site_name','PoppyGram'),('ping_interval_minutes','60'),('max_attempts','3'),('global_credit','100'),('admin_logout_before','1970-01-01T00:00:00.000Z') on conflict(key) do nothing;
 -- Temporary state for interactive Telegram login (phone -> code -> 2FA). Rows are deleted on completion.
 create table if not exists login_sessions(phone text primary key,data jsonb not null,created_at timestamptz not null default now());
 -- The application uses the Supabase service-role key only on the server.

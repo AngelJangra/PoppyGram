@@ -12,6 +12,19 @@ function constEqual(a:string,b:string){if(a.length!==b.length)return false;let r
 let keyPromise:Promise<CryptoKey>|null=null;
 function importKey(){if(!keyPromise){keyPromise=crypto.subtle.importKey('raw',enc.encode(secret()),{name:'HMAC',hash:'SHA-256'},false,['sign'])}return keyPromise}
 async function hmacHex(msg:string){const sig=await crypto.subtle.sign('HMAC',await importKey(),enc.encode(msg));return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+const SESSION_TTL_MS=24*60*60*1000;
+async function globalLogoutBefore(){
+  try{
+    const url=process.env.NEXT_PUBLIC_SUPABASE_URL||'';
+    const key=process.env.SUPABASE_SERVICE_ROLE_KEY||'';
+    if(!url||!key)return null;
+    const r=await fetch(`${url}/rest/v1/settings?select=value&key=eq.admin_logout_before&limit=1`,{headers:{apikey:key,Authorization:`Bearer ${key}`},cache:'no-store'});
+    if(!r.ok)return null;
+    const rows=await r.json();
+    const ts=Date.parse(String(rows?.[0]?.value||''));
+    return Number.isFinite(ts)?ts:null;
+  }catch{return null}
+}
 async function valid(v:string|undefined){
   if(typeof v!=='string')return false;
   try{
@@ -20,7 +33,11 @@ async function valid(v:string|undefined){
     const exp=Number(v.slice(0,dot));
     if(!Number.isFinite(exp)||exp<=Date.now())return false;
     const sig=await hmacHex(`poppygram-admin:${exp}`);
-    return constEqual(v.slice(dot+1),sig);
+    if(!constEqual(v.slice(dot+1),sig))return false;
+    const issuedAt=exp-SESSION_TTL_MS;
+    const revokedBefore=await globalLogoutBefore();
+    if(revokedBefore!==null && issuedAt<=revokedBefore)return false;
+    return true;
   }catch{return false}
 }
 export async function middleware(req:NextRequest){
@@ -28,7 +45,7 @@ export async function middleware(req:NextRequest){
     // Allow unauthenticated entry points: auth, bot webhook (+verify), bot-login
     // start, and the public /botlogin page (Telegram users opening a login
     // link are NOT site admins and have no admin_session cookie).
-  if(path.startsWith('/api/auth/')||path === '/api/bot'||path === '/api/bot-verify'||path.startsWith('/api/tg/bot-login')||path==='/botlogin'||path.startsWith('/botlogin?')||path.startsWith('/botlogin/'))return NextResponse.next();
+  if(path === '/api/auth/login'||path === '/api/auth/logout'||path === '/api/auth/check'||path === '/api/bot'||path === '/api/bot-verify'||path.startsWith('/api/tg/bot-login')||path==='/botlogin'||path.startsWith('/botlogin?')||path.startsWith('/botlogin/'))return NextResponse.next();
   if(path === '/api/ping-all'){
     const auth=req.headers.get('authorization')?.replace(/^Bearer\s+/i,'')||'';
     if(process.env.CRON_SECRET&&auth===process.env.CRON_SECRET)return NextResponse.next();
@@ -48,10 +65,9 @@ export async function middleware(req:NextRequest){
     /\.(?:png|svg|ico|jpg|jpeg|gif|webp|avif|txt|xml|webmanifest)$/i.test(path)
   )return NextResponse.next();
   if(await valid(req.cookies.get('admin_session')?.value))return NextResponse.next();
-  // FIX #7: Unauthenticated users are redirected to the login page.
-  const url=req.nextUrl.clone();
-  url.pathname='/';
-  url.search='';
-  return NextResponse.rewrite(url);
+  // Let the root page render its own login screen. The client checks the
+  // signed session via /api/auth/check, avoiding rewrite loops and ensuring
+  // logout reliably returns to the login form.
+  return NextResponse.next();
 }
 export const config={matcher:['/((?!_next/static|_next/image|favicon.ico).*)']};

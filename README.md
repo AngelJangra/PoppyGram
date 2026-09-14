@@ -89,3 +89,10 @@ Each account has a three-state hard-ping label based on the last completed hard 
 
 ## Session backup history
 Hard Reset now appends the previous encrypted Telegram session to `account_session_backups` before replacing the active session. The legacy `previous_session_encrypted` field is retained for compatibility, but new resets use the separate history table.
+
+
+### Authentication updates (v3.7.0)
+- Root page renders the login screen directly when unauthenticated; no self-rewrite loop.
+- Login/logout cookies work on both local HTTP development and HTTPS production.
+- Settings includes **Sign out all users**, which stores a global revocation timestamp and invalidates older admin sessions.
+- Admin clients re-check authentication every 30 seconds.

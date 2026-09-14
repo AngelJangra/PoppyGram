@@ -22,6 +22,7 @@ export default async function h(req:NextApiRequest,res:NextApiResponse){
   if(!ok)return res.status(401).json({error:'Invalid password'});
   attemptTracker.delete(ip); // reset on success
   const sig=signSession();
-  res.setHeader('Set-Cookie',`admin_session=${sig}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${Math.round(SESSION_TTL_MS/1000)}; Secure`);
+  const secure=req.headers['x-forwarded-proto']==='https'||process.env.NODE_ENV==='production';
+  res.setHeader('Set-Cookie',`admin_session=${sig}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${Math.round(SESSION_TTL_MS/1000)}${secure?'; Secure':''}`);
   res.json({success:true});
 }
