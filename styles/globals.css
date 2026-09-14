@@ -160,9 +160,8 @@ button{touch-action:manipulation}
 .reset-status small{color:#93889e}
 .reset-error{padding:18px;border:1px solid #7f1d1d;background:#29131b;border-radius:10px;color:#fda4af}
 .reset-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
-.chat-safety{font-size:11px;line-height:1.5;padding:10px;border:1px solid #5b4420;background:#241b10;color:#f3c78a;border-radius:9px;margin-bottom:12px}
 .chat-placeholder{min-height:300px;border:1px dashed #352746;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;color:#93889e;padding:20px}
 .chat-placeholder b{color:#eee}
-.chat-placeholder span{font-size:11px;max-width:260px}
+.chat-placeholder span{font-size:11px;max-width:300px;line-height:1.5}.chat-ready{min-height:300px}.telegram-open{margin-top:8px}.chat-note{margin-top:10px;font-size:10px;line-height:1.45;color:#746a80;text-align:center}
 @media(max-width:800px){.hard-reset-grid{grid-template-columns:1fr}.chat-placeholder{min-height:180px}.stepper{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.hard-reset-flow,.hard-reset-chat{padding:12px}.stepper span{font-size:9px}.reset-actions{display:grid;grid-template-columns:1fr}.reset-actions button{width:100%;min-height:44px}}

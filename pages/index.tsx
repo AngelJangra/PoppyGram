@@ -398,7 +398,7 @@ function HardReset(p:{phone:string;onDone:()=>Promise<void>}){
         {step==='success'&&<div className="ok reset-status"><b>Hard reset complete</b><span>{msg}</span><button className="primary" onClick={()=>void onDone()}>Return to dashboard</button></div>}
         {step==='error'&&<div className="reset-error"><b>Something went wrong</b><p>{msg}</p><div className="reset-actions"><button className="primary" onClick={()=>void restart()}>OK — Restart process</button><button className="button" onClick={()=>void onDone()}>I’ll do that later</button></div></div>}
       </div>
-      <div className="hard-reset-chat"><div className="flow-title">Telegram service chat</div><div className="chat-safety">For security, login codes are not copied or mirrored into this panel. Read the code directly in Telegram and enter it on the left.</div><div className="chat-placeholder"><MessageSquare size={22}/><b>Telegram login notifications</b><span>Use your normal Telegram app/chat to read the login code.</span></div></div>
+      <div className="hard-reset-chat"><div className="flow-title">Telegram login</div><div className="chat-placeholder chat-ready"><MessageSquare size={26}/><b>Check Telegram for the login code</b><span>The new login notification is delivered by Telegram to the account. Open Telegram, read the code, then enter it on the left.</span><button className="button telegram-open" type="button" onClick={()=>{window.location.href="tg://user?id=777000"}}>Open Telegram</button></div><div className="chat-note">The code is entered manually so PoppyGram never copies or intercepts your Telegram authentication code.</div></div>
     </div>
   </section></div>;
 }
