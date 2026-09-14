@@ -66,3 +66,70 @@ button{touch-action:manipulation}
 }
 @media(max-width:390px){.app aside>.nav{flex-basis:68px;width:68px}.stats{grid-template-columns:1fr 1fr}.stat strong{font-size:21px}.page{padding:10px}}
 @media(display-mode:standalone){.main header{padding-top:calc(12px + env(safe-area-inset-top))}.login{padding-top:env(safe-area-inset-top)}}
+
+
+/* Account-list responsiveness: desktop keeps the table; phones use readable cards. */
+.qadd{display:flex;flex:0 1 360px;min-width:220px;gap:8px;align-items:stretch}
+.qinput{width:100%;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid #302441;background:#151021;color:#fff;outline:none}
+.qadd .primary{flex:0 0 auto}
+.secondary{background:#21172e;border:1px solid #352746;color:#eee;padding:10px 14px;border-radius:9px;cursor:pointer;font-weight:600;white-space:nowrap}
+.secondary:disabled,.primary:disabled,.icon:disabled{opacity:.55;cursor:not-allowed}
+.act{display:flex;gap:5px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.act .icon{padding:7px;display:inline-flex;align-items:center;justify-content:center}
+.tag{display:inline-flex;align-items:center;width:max-content;padding:4px 8px;border-radius:999px;font-size:11px;background:#2a2034;color:#d8cbe0}
+.tag.ok{background:#123521;color:#86efac}
+.tag.bad{background:#3a1722;color:#fda4af}
+
+@media(max-width:720px){
+  .toolbar{display:grid;grid-template-columns:1fr 1fr;gap:9px;align-items:stretch}
+  .toolbar .search{grid-column:1/-1;width:100%;max-width:none;min-width:0}
+  .qadd{width:100%;min-width:0;flex:initial}
+  .toolbar>.secondary{width:100%;min-width:0}
+  .qinput{min-width:0;font-size:13px}
+  .primary,.secondary{min-height:44px}
+  .table.account-list{overflow:visible;border-radius:12px;background:transparent;border:0}
+  .account-list .thead{display:none}
+  .account-list .tr{
+    min-width:0;
+    width:100%;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:
+      "account status"
+      "interval interval"
+      "next next"
+      "actions actions";
+    gap:0 12px;
+    padding:14px;
+    margin:0 0 10px;
+    border:1px solid #281d39;
+    border-radius:12px;
+    background:#151021;
+    align-items:center;
+  }
+  .account-list .tr>div:first-child{grid-area:account;min-width:0}
+  .account-list .tr>span:nth-child(2){grid-area:status;justify-self:end}
+  .account-list .tr>span:nth-child(3){grid-area:interval}
+  .account-list .tr>span:nth-child(4){grid-area:next}
+  .account-list .tr>span:last-child{grid-area:actions}
+  .account-list .tr>span:nth-child(3),
+  .account-list .tr>span:nth-child(4){
+    display:flex;justify-content:space-between;align-items:center;
+    width:100%;padding:9px 0;border-top:1px solid #241a31;
+    color:#ddd4e5;font-size:12px;
+  }
+  .account-list .tr>span:nth-child(3)::before{content:'Interval';color:#81768d;font-size:10px;text-transform:uppercase;margin-right:10px}
+  .account-list .tr>span:nth-child(4)::before{content:'Next ping';color:#81768d;font-size:10px;text-transform:uppercase;margin-right:10px}
+  .account-list .tr>span:last-child{padding-top:10px;border-top:1px solid #241a31}
+  .account-list .tr small{font-size:11px;overflow-wrap:anywhere}
+  .account-list .act{justify-content:flex-end;gap:7px}
+  .account-list .act .icon{min-width:42px;min-height:42px;padding:9px;border-radius:9px}
+  .scheduler-list .tr>span:nth-child(5){grid-area:actions;display:flex;justify-content:flex-end;padding-top:10px;border-top:1px solid #241a31;font-size:12px}
+  .scheduler-list .tr>span:nth-child(5)::before{content:'Failures';margin-right:auto;color:#81768d;font-size:10px;text-transform:uppercase}
+}
+@media(max-width:390px){
+  .toolbar{grid-template-columns:1fr}
+  .toolbar .search,.qadd,.toolbar>.secondary{grid-column:auto}
+  .qadd{display:grid;grid-template-columns:minmax(0,1fr) auto}
+  .account-list .tr{padding:13px}
+}
