@@ -46,6 +46,35 @@ async function sendTelegramMessage(fromPhone:string,to:string,text:string):Promi
   finally{await closeBrowserClient(client)}
 }
 
+function PWAControls(){
+  const[installEvent,setInstallEvent]=useState<any>(null);
+  const[online,setOnline]=useState(true);
+  const[showIos,setShowIos]=useState(false);
+  useEffect(()=>{
+    setOnline(navigator.onLine);
+    const onOnline=()=>setOnline(true),onOffline=()=>setOnline(false);
+    window.addEventListener('online',onOnline);window.addEventListener('offline',onOffline);
+    const onBeforeInstall=(e:Event)=>{e.preventDefault();setInstallEvent(e)};
+    window.addEventListener('beforeinstallprompt',onBeforeInstall);
+    const ua=navigator.userAgent||'';
+    const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    const standalone=window.matchMedia?.('(display-mode: standalone)').matches||!!(navigator as any).standalone;
+    if(ios&&!standalone)setShowIos(true);
+    return()=>{window.removeEventListener('online',onOnline);window.removeEventListener('offline',onOffline);window.removeEventListener('beforeinstallprompt',onBeforeInstall)};
+  },[]);
+  const install=async()=>{
+    if(!installEvent)return;
+    await installEvent.prompt();
+    await installEvent.userChoice.catch(()=>null);
+    setInstallEvent(null);
+  };
+  return <>
+    {!online&&<div className="offline-bar" role="status">Offline — reconnect to use Telegram and live account data.</div>}
+    {installEvent&&<button className="pwa-install" onClick={install}><Download size={16}/> Install app</button>}
+    {showIos&&<button className="pwa-ios" onClick={()=>setShowIos(false)} aria-label="Dismiss iPhone install tip">On iPhone/iPad: Share → Add to Home Screen</button>}
+  </>;
+}
+
 function Login(p:{onLogin:()=>void}){const{onLogin}=p;const[pa,setPa]=useState('');const[e,setE]=useState('');const submit=async(x:any)=>{x.preventDefault();setE('');try{await api('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pa})});onLogin()}catch(err:any){setE(err.message)}};return <main className="login"><div className="login-card"><div className="logo"><img src="/poppygram.png" alt="PoppyGram logo"/></div><h1>PoppyGram</h1><p>Administration console</p><form onSubmit={submit}><input type="password" value={pa} onChange={e=>setPa(e.target.value)} placeholder="Admin password" autoFocus/><button>🔐 Sign in</button>{e&&<div className="error">{e}</div>}</form><small>Private administration interface</small></div></main>}
 
 function TGOfficialChat(p:{phone:string;onBack:()=>void}){
@@ -449,7 +478,7 @@ function App(){
     <aside><div className="brand"><img src="/poppygram.png" alt="PoppyGram logo"/><b>PoppyGram</b></div>
       {tabs.map(([id,name,Icon]:any)=><button className={tab===id?'nav active':'nav'} onClick={()=>setTab(id)} key={id}><Icon size={18}/>{name}</button>)}
       <div className="side-bottom"><button className="nav" onClick={()=>setDark(!dark)}>{dark?<Sun size={18}/>:<Moon size={18}/>}{dark?'Light':'Dark'}</button><button className="nav danger" onClick={logout}><LogOut size={18}/>Sign out</button></div></aside>
-    <main className="main"><header><div><h2>{tabs.find((t:any)=>t[0]===tab)?.[1]||'Dashboard'}</h2><div className="sub">PoppyGram administration console</div></div><span className={"timer"+(remain<=30?' timer-warn':'')} title="Admin session time remaining">{fmt(remain)}</span><div className="msgbox">{msg}</div></header>
+    <main className="main"><PWAControls/><header><div><h2>{tabs.find((t:any)=>t[0]===tab)?.[1]||'Dashboard'}</h2><div className="sub">PoppyGram administration console</div></div><span className={"timer"+(remain<=30?' timer-warn':'')} title="Admin session time remaining">{fmt(remain)}</span><div className="msgbox">{msg}</div></header>
       {tab==='dashboard'&&<Health health={health} accounts={accounts} logs={logs}/>}
       {tab==='accounts'&&<Accounts accounts={filtered} q={q} setQ={setQ} action={action} onOpen={(p:string)=>setTgPhone(p)}/>}
       {tab==='add'&&<AddAccount onDone={()=>{setTab('accounts');load()}}/>}

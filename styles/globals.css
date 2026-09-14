@@ -36,4 +36,33 @@ select.finput option{background:#151021}
 .timer-warn{background:#3a1722;color:#fda4af;border-color:#7f1d1d;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .brand img{width:34px;height:34px;object-fit:contain;border-radius:8px;flex-shrink:0}
-.logo img{width:76px;height:76px;object-fit:contain;margin:0 auto;display:block;border-radius:16px}
+.logo img{width:76px;height:76px;object-fit:contain;margin:0 auto;display:block;border-radius:16px}/* PWA/mobile ergonomics */
+html{background:#0b0712;overscroll-behavior-y:none}
+body{min-width:320px;min-height:100vh;overflow-x:hidden;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
+button,input,select,textarea{font:inherit}
+button{touch-action:manipulation}
+.pwa-install{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:50;background:linear-gradient(90deg,#7c3aed,#db2777);border:0;color:#fff;padding:11px 15px;border-radius:999px;box-shadow:0 8px 30px #0008;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.pwa-ios{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));z-index:49;max-width:calc(100% - 32px);padding:10px 14px;border:1px solid #4b3b5f;border-radius:12px;background:#181022;color:#eee;box-shadow:0 8px 30px #0008;font-size:12px;cursor:pointer}
+.offline-bar{position:fixed;top:0;left:0;right:0;z-index:60;text-align:center;padding:8px 12px;background:#3a1722;color:#fda4af;font-size:12px;font-weight:600;padding-top:calc(8px + env(safe-area-inset-top))}
+@media(min-width:721px){.main header{padding-top:env(safe-area-inset-top);height:calc(78px + env(safe-area-inset-top))}}
+@media(max-width:720px){
+  .app{padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+  .app aside{position:fixed;left:0;right:0;bottom:0;z-index:40;width:100%;height:auto;min-height:64px;display:flex;flex-direction:row;align-items:stretch;overflow-x:auto;overflow-y:hidden;padding:5px 6px calc(5px + env(safe-area-inset-bottom));background:#110b1df5;border-right:0;border-top:1px solid #281d39;backdrop-filter:blur(16px);-webkit-overflow-scrolling:touch}
+  .brand{display:none}
+  .app aside>.nav{flex:0 0 76px;width:76px;min-height:54px;margin:0 2px;padding:7px 4px;border-radius:9px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;font-size:10px;text-align:center;white-space:nowrap}
+  .app aside>.nav.active{box-shadow:inset 0 3px #a855f7}
+  .side-bottom{display:contents}
+  .main header{height:auto;min-height:68px;padding:12px 14px;gap:8px;position:sticky;top:0}
+  .main h2{font-size:19px}.sub{font-size:10px}
+  .timer{font-size:11px;padding:5px 8px}
+  .page{padding:12px}
+  .stats{gap:9px}.stat{padding:13px;min-width:0}.stat strong{font-size:23px}.stat small{font-size:10px}
+  .panel{padding:14px;border-radius:12px}
+  .log{grid-template-columns:68px 95px 1fr;font-size:11px}
+  .health-card{padding:18px}.health-card b{font-size:21px}
+  .chat-scroll{max-height:calc(100vh - 220px);padding:14px 10px}.bubble{max-width:86%;font-size:13px}
+  .pwa-install{right:12px;bottom:calc(78px + env(safe-area-inset-bottom));font-size:12px}
+  .pwa-ios{bottom:calc(78px + env(safe-area-inset-bottom))}
+}
+@media(max-width:390px){.app aside>.nav{flex-basis:68px;width:68px}.stats{grid-template-columns:1fr 1fr}.stat strong{font-size:21px}.page{padding:10px}}
+@media(display-mode:standalone){.main header{padding-top:calc(12px + env(safe-area-inset-top))}.login{padding-top:env(safe-area-inset-top)}}

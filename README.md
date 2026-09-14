@@ -71,3 +71,13 @@ Exports contain encrypted Telegram session fields and must be treated as highly 
 ## Security
 
 Use Telegram API credentials only for accounts you own or are authorized to administer. If a secret from an old `.env.local` was ever committed, uploaded, or shared, rotate it before deploying this version.
+
+## PWA / mobile home-screen support
+
+PoppyGram is configured as an installable PWA for Android, iPhone/iPad, and desktop/laptop browsers. It includes a web app manifest, 192px/512px install icons, iOS home-screen metadata, a conservative service worker, safe-area support, responsive mobile navigation, an Android/desktop install prompt, and offline/reconnect messaging.
+
+The service worker deliberately does **not** cache `/api/*`, authentication/session responses, Supabase data, or Telegram data. Static Next.js assets may be cached for faster repeat loads.
+
+On Android/Chrome/Edge, use the **Install app** prompt when it appears. On iPhone/iPad Safari, use **Share → Add to Home Screen**.
+
+Important: installing PoppyGram as a PWA does not turn the browser-side Telegram/MTProto scheduler into a true background worker. Telegram account pings still require the PWA/site browser context to be running. A persistent server/worker is required for scheduling while the app is completely closed.
