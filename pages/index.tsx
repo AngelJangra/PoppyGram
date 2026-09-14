@@ -350,6 +350,8 @@ function App(){
   const[settings,setSettings]=useState<any>({});
   const[q,setQ]=useState('');
   const accountsRef=useRef<Account[]>([]);
+  // Must be declared before every conditional return so the hook order never changes.
+  const schedulerBusyRef=useRef(false);
   const[dark,setDark]=useState(false);
   const[msg,setMsg]=useState('');
   const[tgPhone,setTgPhone]=useState<string|null>(null);
@@ -419,7 +421,6 @@ function App(){
   if(!logged)return <Login onLogin={()=>{setLogged(true);setExpiresAt(Date.now()+SESSION_SECONDS*1000);setRemain(SESSION_SECONDS);load()}}/>;
   if(tgPhone)return <TGOfficialChat phone={tgPhone} onBack={()=>{setTgPhone(null);load()}}/>;
   const action=async(path:string,body?:any)=>{try{await api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});setMsg('Done');await load()}catch(e:any){setMsg(e.message)}};
-  const schedulerBusyRef=useRef(false);
   const runDue=async()=>{
     if(schedulerBusyRef.current)return;
     schedulerBusyRef.current=true;
