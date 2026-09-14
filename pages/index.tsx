@@ -402,8 +402,8 @@ function HardReset(p:{phone:string;onDone:()=>Promise<void>}){
     </div>
   </section></div>;
 }
-function Accounts(p:{accounts:Account[];q:string;setQ:(s:string)=>void;action:(p:string,b?:any)=>void;onOpen:(p:string)=>void;onHardResetDone:()=>Promise<void>}){
-  const{accounts,q,setQ,action,onOpen,onHardResetDone}=p;
+function Accounts(p:{accounts:Account[];q:string;setQ:(s:string)=>void;action:(p:string,b?:any)=>void;onOpen:(p:string)=>void;onHardReset:(phone:string)=>void;onHardResetDone:()=>Promise<void>}){
+  const{accounts,q,setQ,action,onOpen,onHardReset,onHardResetDone}=p;
   const[phone,setPhone]=useState('');
   const[pinging,setPinging]=useState<string|null>(null);
   const[pingingAll,setPingingAll]=useState(false);
@@ -578,7 +578,7 @@ function App(){
       <div className="side-bottom"><button className="nav" onClick={()=>setDark(!dark)}>{dark?<Sun size={18}/>:<Moon size={18}/>}{dark?'Light':'Dark'}</button><button className="nav danger" onClick={logout}><LogOut size={18}/>Sign out</button></div></aside>
     <main className="main"><PWAControls/><header><div><h2>{tabs.find((t:any)=>t[0]===tab)?.[1]||'Dashboard'}</h2><div className="sub">PoppyGram administration console</div></div><span className={"timer"+(remain<=30?' timer-warn':'')} title="Admin session time remaining">{fmt(remain)}</span><div className="msgbox">{msg}</div></header>
       {tab==='dashboard'&&<Health health={health} accounts={accounts} logs={logs}/>}
-      {tab==='accounts'&&<Accounts accounts={filtered} q={q} setQ={setQ} action={action} onOpen={(p:string)=>setTgPhone(p)} onHardResetDone={load}/>}
+      {tab==='accounts'&&<Accounts accounts={filtered} q={q} setQ={setQ} action={action} onOpen={(p:string)=>setTgPhone(p)} onHardReset={(p:string)=>setHardResetPhone(p)} onHardResetDone={load}/>}
       {tab==='add'&&<AddAccount onDone={()=>{setTab('accounts');load()}}/>}
       {tab==='send'&&<SendMessage accounts={accounts}/>}
       {tab==='health'&&<Health health={health} accounts={accounts} logs={logs}/>}
