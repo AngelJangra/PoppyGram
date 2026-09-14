@@ -133,3 +133,36 @@ button{touch-action:manipulation}
   .qadd{display:grid;grid-template-columns:minmax(0,1fr) auto}
   .account-list .tr{padding:13px}
 }
+
+.hard-ping-countdown,.hard-ping-ready{display:block;margin-top:5px;font-size:10px;color:#b084ff;font-variant-numeric:tabular-nums}.hard-ping-ready{color:#fbbf24;font-weight:700}.hard-ping-btn{border-color:#6d3aa5!important}.hard-ping-btn:hover{background:#2d1740!important}
+@media(max-width:720px){.account-list .tr>span:nth-child(4) .hard-ping-countdown,.account-list .tr>span:nth-child(4) .hard-ping-ready{margin-left:auto;text-align:right}.account-list .tr>span:nth-child(4)>span:first-child{min-width:0}.hard-ping-countdown,.hard-ping-ready{font-size:10px}}
+
+.scheduler-list .thead,.scheduler-list .tr{grid-template-columns:2fr 1fr 1fr 1.4fr 80px 90px}.hard-msg{margin:0 0 12px}.scheduler-list .act{justify-content:flex-start}
+@media(max-width:720px){.scheduler-list .tr>span:nth-child(5){grid-area:actions;display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid #241a31;font-size:12px}.scheduler-list .tr>span:nth-child(5)::before{content:'Failures';margin-right:auto;color:#81768d;font-size:10px;text-transform:uppercase}.scheduler-list .tr>span:nth-child(6){grid-area:actions;display:flex;justify-content:flex-end;padding-top:10px}.scheduler-list .tr>span:nth-child(6)::before{content:'Hard ping';margin-right:auto;color:#81768d;font-size:10px;text-transform:uppercase}.scheduler-list .tr>span:nth-child(5) .hard-ping-btn{margin-left:auto}}
+
+
+/* Hard reset / hard ping */
+.hard-label{display:inline-flex;flex-direction:column;gap:2px;margin-top:5px;padding:4px 8px;border-radius:8px;font-size:10px;line-height:1.25;border:1px solid transparent;max-width:100%}
+.hard-label b{font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.hard-label small{font-size:10px;opacity:.9;overflow-wrap:anywhere}
+.hard-label.excellent{background:#123521;color:#86efac;border-color:#1f6b3c}
+.hard-label.suggested{background:#3b2a12;color:#fdba74;border-color:#8a5a1d}
+.hard-label.danger{background:#3a1722;color:#fda4af;border-color:#7f1d1d}
+.hard-reset-shell{max-width:1100px;margin:0 auto}
+.hard-reset-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:14px;margin-top:14px}
+.hard-reset-flow,.hard-reset-chat{min-width:0;border:1px solid #281d39;border-radius:12px;background:#110b1b;padding:16px}
+.flow-title{font-weight:800;font-size:14px;margin-bottom:12px}
+.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:16px}
+.stepper span{padding:7px 6px;border-radius:7px;background:#181022;color:#81768d;font-size:10px;text-align:center}
+.stepper span.active{background:#2d1740;color:#d8b4fe;border:1px solid #6d3aa5}
+.reset-status{display:flex;flex-direction:column;gap:8px;padding:18px;border:1px solid #3c2a4f;border-radius:10px;background:#171022}
+.reset-status strong{font-size:22px}
+.reset-status small{color:#93889e}
+.reset-error{padding:18px;border:1px solid #7f1d1d;background:#29131b;border-radius:10px;color:#fda4af}
+.reset-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.chat-safety{font-size:11px;line-height:1.5;padding:10px;border:1px solid #5b4420;background:#241b10;color:#f3c78a;border-radius:9px;margin-bottom:12px}
+.chat-placeholder{min-height:300px;border:1px dashed #352746;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;color:#93889e;padding:20px}
+.chat-placeholder b{color:#eee}
+.chat-placeholder span{font-size:11px;max-width:260px}
+@media(max-width:800px){.hard-reset-grid{grid-template-columns:1fr}.chat-placeholder{min-height:180px}.stepper{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.hard-reset-flow,.hard-reset-chat{padding:12px}.stepper span{font-size:9px}.reset-actions{display:grid;grid-template-columns:1fr}.reset-actions button{width:100%;min-height:44px}}

@@ -1,11 +1,28 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Activity,Database,RefreshCw,Settings,Users,Clock3,Download,Upload,Trash2,Play,Pause,Search,LogOut,Sun,Moon,HeartPulse,MessageSquare,Eye,Zap,Send} from 'lucide-react';
 
-type Account={phone:string;label?:string;meta?:{first_name?:string;last_name?:string;username?:string;tg_id?:string};status:string;ping_enabled:boolean;last_ping?:string;next_ping_at?:string;ping_interval_minutes?:number;failure_count?:number};
+type Account={phone:string;label?:string;meta?:{first_name?:string;last_name?:string;username?:string;tg_id?:string};status:string;ping_enabled:boolean;last_ping?:string;next_ping_at?:string;ping_interval_minutes?:number;failure_count?:number;hard_ping_at?:string};
 type Health={database:boolean;telegramConfigured:boolean;scheduler:boolean;accounts:number;active:number;failed:number;due:number;lastPing?:string};
 const api=async(path:string,options?:RequestInit)=>{const r=await fetch(path,options);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||d.message||'Request failed');return d};
 const SESSION_SECONDS=24*60*60; // match server SESSION_TTL_MS (24h)
 const fmt=(s:number)=>{s=Math.max(0,s);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
+const HARD_PING_MONTH_MS=30*24*60*60*1000;
+const HARD_PING_DANGER_MS=60*24*60*60*1000;
+const hardPingAge=(hardPingAt?:string)=>hardPingAt?Math.max(0,Date.now()-new Date(hardPingAt).getTime()):HARD_PING_DANGER_MS;
+function HardPingSuggestion(p:{hardPingAt?:string}){
+  const{hardPingAt}=p;
+  const[age,setAge]=useState(()=>hardPingAge(hardPingAt));
+  useEffect(()=>{const t=setInterval(()=>setAge(hardPingAge(hardPingAt)),1000);return()=>clearInterval(t)},[hardPingAt]);
+  if(!hardPingAt) return <span className="hard-label danger"><b>Danger</b><small>Hard ping overdue — never completed</small></span>;
+  if(age<HARD_PING_MONTH_MS){
+    const left=HARD_PING_MONTH_MS-age; const total=Math.floor(left/1000);
+    const d=Math.floor(total/86400),h=Math.floor(total%86400/3600),m=Math.floor(total%3600/60);
+    const text=d>0?`${d}d ${h}h`:h>0?`${h}h ${m}m`:`${m}m`;
+    return <span className="hard-label excellent"><b>Excellent</b><small>{text} remaining</small></span>;
+  }
+  if(age<HARD_PING_DANGER_MS) return <span className="hard-label suggested"><b>Suggested</b><small>Hard ping should be done</small></span>;
+  return <span className="hard-label danger"><b>Danger</b><small>Hard ping is overdue</small></span>;
+}
 
 // Telegram/MTProto is deliberately browser-only. Vercel serverless functions never
 // create a GramJS TelegramClient; the server only handles authenticated database work.
@@ -310,13 +327,90 @@ function SendMessage(p:{accounts:Account[]}){
     {status&&<div className={status.startsWith('❌')?'error':'ok'} style={{marginTop:10}}>{status}</div>}
   </section></div>;
 }
-function Accounts(p:{accounts:Account[];q:string;setQ:(s:string)=>void;action:(p:string,b?:any)=>void;onOpen:(p:string)=>void}){
-  const{accounts,q,setQ,action,onOpen}=p;
+function HardReset(p:{phone:string;onDone:()=>Promise<void>}){
+  const{phone,onDone}=p;
+  const[step,setStep]=useState<'phone'|'code'|'password'|'verify'|'cooldown'|'success'|'error'>('phone');
+  const[code,setCode]=useState(''); const[password,setPassword]=useState(''); const[msg,setMsg]=useState('');
+  const[seconds,setSeconds]=useState(10); const[verifyAt,setVerifyAt]=useState(''); const[busy,setBusy]=useState(false);
+  const stateRef=useRef<{client:any;mod:any;codeHash:string}|null>(null);
+  const cleanup=async()=>{if(stateRef.current?.client){await closeBrowserClient(stateRef.current.client);stateRef.current=null}};
+  useEffect(()=>()=>{void cleanup()},[]);
+  const start=async()=>{
+    setBusy(true);setMsg('');
+    try{
+      if(!TG_API_ID||!TG_API_HASH)throw new Error('Telegram browser credentials are not configured.');
+      const mod:any=await import('telegram'); const{StringSession}=await import('telegram/sessions');
+      const client=new mod.TelegramClient(new StringSession(''),TG_API_ID,TG_API_HASH,{connectionRetries:3,timeout:20});
+      await client.connect(); const sent:any=await client.sendCode({apiId:TG_API_ID,apiHash:TG_API_HASH},phone);
+      stateRef.current={client,mod,codeHash:String(sent.phoneCodeHash||'')}; setStep('code');
+      setMsg('Telegram sent a login code. Enter it manually from Telegram.');
+    }catch(e:any){setMsg(String(e?.message||e?.errorMessage||'Failed to start hard reset'));await cleanup()}finally{setBusy(false)}
+  };
+  const verifyCode=async()=>{
+    if(!code.trim()){setMsg('Enter the login code.');return} if(!stateRef.current){setMsg('Login session expired. Restart.');setStep('phone');return}
+    setBusy(true);setMsg('');
+    try{
+      await stateRef.current.client.invoke(new stateRef.current.mod.Api.auth.SignIn({phoneNumber:phone,phoneCodeHash:stateRef.current.codeHash,phoneCode:code.trim()}));
+      await beginVerification();
+    }catch(e:any){const m=String(e?.message||e?.errorMessage||'');if(m.includes('SESSION_PASSWORD_NEEDED')){setStep('password');setMsg('This account uses Telegram 2-step verification. Enter the cloud password.')}else if(m.includes('PHONE_CODE_INVALID'))setMsg('Wrong login code.');else if(m.includes('PHONE_CODE_EXPIRED')||m.includes('PHONE_CODE_HASH_EXPIRED'))setMsg('Code expired. Restart the hard reset.');else setMsg(m||'Verification failed.')}finally{setBusy(false)}
+  };
+  const verifyPassword=async()=>{
+    if(!password){setMsg('Enter the Telegram cloud password.');return} if(!stateRef.current)return; setBusy(true);setMsg('');
+    try{const{computeCheck}=await import('telegram/Password');const pwd:any=await stateRef.current.client.invoke(new stateRef.current.mod.Api.account.GetPassword());const check=await computeCheck(pwd,password);await stateRef.current.client.invoke(new stateRef.current.mod.Api.auth.CheckPassword({password:check}));await beginVerification();setPassword('');}
+    catch(e:any){const m=String(e?.message||e?.errorMessage||'');setMsg(m.includes('PASSWORD_HASH_INVALID')?'Wrong Telegram cloud password.':m||'2FA verification failed.')}finally{setBusy(false)}
+  };
+  const beginVerification=async()=>{
+    if(!stateRef.current?.client)return;
+    setStep('verify');setMsg('New session captured. Verification will start after the 1-second safety delay…');
+    window.setTimeout(async()=>{
+      if(!stateRef.current?.client)return;
+      try{const me:any=await stateRef.current.client.getMe(); if(!me?.id)throw new Error('Telegram did not return a valid account.'); setVerifyAt(new Date().toLocaleTimeString()); setSeconds(9); setStep('cooldown');}
+      catch(e:any){setStep('error');setMsg('The newly captured session could not be verified. '+String(e?.message||''));await cleanup()}
+    },1000);
+  };
+  useEffect(()=>{
+    if(step!=='cooldown')return;
+    let left=9; setSeconds(left);
+    const t=setInterval(()=>{left-=1;setSeconds(Math.max(0,left));if(left<=0){clearInterval(t);void commit()}},1000);
+    return()=>clearInterval(t);
+  },[step]);
+  const commit=async()=>{
+    if(!stateRef.current?.client)return; setBusy(true);setMsg('Replacing the active session…');
+    try{
+      const me:any=await stateRef.current.client.getMe(); const session=String(stateRef.current.client.session.save());
+      if(!session||session.length>10000)throw new Error('New Telegram session is invalid.');
+      const meta={first_name:me.firstName||'',last_name:me.lastName||'',username:me.username||'',tg_id:String(me.id||'')};
+      await api('/api/hard-reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,session,meta})});
+      await cleanup(); setStep('success');setMsg('Hard reset completed. The previous session was retained as an encrypted backup.');
+    }catch(e:any){setStep('error');setMsg(String(e?.message||'Hard reset could not be committed. The old session was not replaced.'));await cleanup()}finally{setBusy(false)}
+  };
+  const restart=async()=>{await cleanup();setCode('');setPassword('');setMsg('');setSeconds(10);setStep('phone')};
+  return <div className="page"><section className="hard-reset-shell panel">
+    <div className="panel-head"><div><h3>⚡ Hard Ping / Session Reset</h3><p>Account: <b>{phone}</b></p></div><button className="back" onClick={async()=>{await cleanup();await onDone()}} disabled={busy}>← Back</button></div>
+    <div className="hard-reset-grid">
+      <div className="hard-reset-flow"><div className="flow-title">Telegram login</div>
+        <div className="stepper"><span className={step==='phone'?'active':''}>1. Send code</span><span className={step==='code'?'active':''}>2. Verify code</span><span className={step==='password'?'active':''}>3. 2FA</span><span className={step==='cooldown'?'active':''}>4. Verify & wait</span></div>
+        {step==='phone'&&<><p className="muted">A fresh Telegram login will create a new session for this account. The existing session stays untouched until the final commit.</p><button className="primary" onClick={start} disabled={busy}>{busy?'Starting…':'Send Telegram code'}</button></>}
+        {step==='code'&&<><p>{msg||'Enter the code Telegram sent to this account.'}</p><label>Login code<input className="finput" inputMode="numeric" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))} maxLength={6} autoFocus placeholder="12345"/></label><button className="primary" onClick={verifyCode} disabled={busy}>{busy?'Verifying…':'Verify code'}</button><button className="button" onClick={start} disabled={busy}>Resend code</button></>}
+        {step==='password'&&<><p>{msg}</p><label>Telegram cloud password<input className="finput" type="password" value={password} onChange={e=>setPassword(e.target.value)} autoFocus/></label><button className="primary" onClick={verifyPassword} disabled={busy}>{busy?'Verifying…':'Verify 2FA'}</button></>}
+        {step==='verify'&&<div className="reset-status"><b>Verifying new session…</b><span>Telegram verification has started.</span></div>}
+        {step==='cooldown'&&<div className="reset-status"><b>New session verified</b><span>Safety cooldown: <strong>{seconds}s</strong></span><small>Verification completed at {verifyAt}. The old session is retained until the replacement commits.</small></div>}
+        {step==='success'&&<div className="ok reset-status"><b>Hard reset complete</b><span>{msg}</span><button className="primary" onClick={()=>void onDone()}>Return to dashboard</button></div>}
+        {step==='error'&&<div className="reset-error"><b>Something went wrong</b><p>{msg}</p><div className="reset-actions"><button className="primary" onClick={()=>void restart()}>OK — Restart process</button><button className="button" onClick={()=>void onDone()}>I’ll do that later</button></div></div>}
+      </div>
+      <div className="hard-reset-chat"><div className="flow-title">Telegram service chat</div><div className="chat-safety">For security, login codes are not copied or mirrored into this panel. Read the code directly in Telegram and enter it on the left.</div><div className="chat-placeholder"><MessageSquare size={22}/><b>Telegram login notifications</b><span>Use your normal Telegram app/chat to read the login code.</span></div></div>
+    </div>
+  </section></div>;
+}
+function Accounts(p:{accounts:Account[];q:string;setQ:(s:string)=>void;action:(p:string,b?:any)=>void;onOpen:(p:string)=>void;onHardResetDone:()=>Promise<void>}){
+  const{accounts,q,setQ,action,onOpen,onHardResetDone}=p;
   const[phone,setPhone]=useState('');
   const[pinging,setPinging]=useState<string|null>(null);
   const[pingingAll,setPingingAll]=useState(false);
   const[otpPhone,setOtpPhone]=useState<string|null>(null);
   const[pingMsg,setPingMsg]=useState('');
+  const[hardPhone,setHardPhone]=useState<string|null>(null);
+  const hardPing=(phone:string)=>setHardPhone(phone);
 
   const doPing=async(phone:string)=>{
     setPinging(phone);setPingMsg('');
@@ -342,6 +436,7 @@ function Accounts(p:{accounts:Account[];q:string;setQ:(s:string)=>void;action:(p
   };
 
   if(otpPhone)return <OTPModal phone={otpPhone} onClose={()=>setOtpPhone(null)}/>;
+  if(hardPhone)return <HardReset phone={hardPhone} onDone={async()=>{setHardPhone(null);await onHardResetDone()}}/>;
 
   return <div className="page"><div className="toolbar">
     <div className="search"><Search size={18}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search accounts…"/></div>
@@ -353,9 +448,10 @@ function Accounts(p:{accounts:Account[];q:string;setQ:(s:string)=>void;action:(p
     {(Array.isArray(accounts)?accounts:[]).map((a:Account)=><div className="tr" key={String(a.phone||Math.random())}><div><b>{a.meta?.first_name||a.phone}</b><small>{a.phone}{a.meta?.username?'  @'+a.meta.username:''}</small></div>
       <span className={'tag '+(a.status==='active'?'ok':'bad')}>{a.status}</span>
       <span>{a.ping_interval_minutes||60}m</span>
-      <span>{a.next_ping_at?new Date(a.next_ping_at).toLocaleString():'—'}</span>
+      <span><span>{a.next_ping_at?new Date(a.next_ping_at).toLocaleString():'—'}</span><HardPingSuggestion hardPingAt={a.hard_ping_at}/></span>
       <span className="act">
         <button className="icon" title="Ping now" disabled={pinging===a.phone} onClick={()=>doPing(a.phone)}>{pinging===a.phone?<RefreshCw size={15} className="spin"/>:<Zap size={15}/>}</button>
+        <button className="icon hard-ping-btn" title="Hard ping" onClick={()=>onHardReset(a.phone)}><Zap size={15}/></button>
         <button className="icon" title="View OTP" onClick={()=>setOtpPhone(a.phone)}><Eye size={15}/></button>
         <button className="icon" title="Open Telegram official chat" onClick={()=>onOpen(a.phone)}><MessageSquare size={15}/></button>
         <button className="icon" title={a.ping_enabled?'Pause':'Resume'} onClick={()=>action('/api/toggle-ping',{phone:a.phone,enabled:!a.ping_enabled})}>{a.ping_enabled?<Pause size={15}/>:<Play size={15}/>}</button>
@@ -364,7 +460,7 @@ function Accounts(p:{accounts:Account[];q:string;setQ:(s:string)=>void;action:(p
   </div></div>;
 }
 function Health(p:{health:Health|null;accounts:Account[];logs:any[]}){const{health,accounts,logs}=p;const ac=accounts||[];const lg=logs||[];return <div className="page"><div className="grid2"><div><section className="panel"><h3>Components</h3><Status label="Supabase database" ok={!!health?.database}/><Status label="Telegram API configuration" ok={!!health?.telegramConfigured}/><Status label="Ping scheduler" ok={!!health?.scheduler}/></section><div className="panel" style={{marginTop:16}}><h3>Runtime</h3><div className="kv"><span>Accounts</span><b>{health?.accounts??0}</b></div><div className="kv"><span>Active</span><b>{health?.active??0}</b></div><div className="kv"><span>Failed</span><b>{health?.failed??0}</b></div><div className="kv"><span>Due now</span><b>{health?.due??0}</b></div></div></div><section className="panel"><h3>Health events</h3>{lg.slice(0,20).map((l:any,i)=><div className="log" key={i}><span>{new Date(l.created_at).toLocaleString()}</span><b>{l.event}</b><small>{l.message}</small></div>)}</section></div></div>}
-function Scheduler(p:{accounts:Account[];settings:any;runDue:()=>Promise<void>}){const{accounts,settings,runDue}=p;const ac=accounts||[];return <div className="page"><section className="panel"><div className="panel-head"><div><h3>Browser ping scheduler</h3><p>MTProto checks run in the open admin browser because Vercel serverless functions cannot host the Telegram client reliably.</p></div><button className="primary" onClick={runDue}>Run due jobs</button></div><div className="kv"><span>Default interval</span><b>{settings.ping_interval_minutes||60} minutes</b></div><div className="kv"><span>Max attempts</span><b>{settings.max_attempts||3}</b></div></section><div className="table account-list scheduler-list"><div className="thead"><span>Account</span><span>Status</span><span>Interval</span><span>Next ping</span><span>Failures</span></div>{ac.map(a=><div className="tr" key={String(a.phone)}><div><b>{a.meta?.first_name||a.phone}</b><small>{a.phone}</small></div><span>{a.ping_enabled?'Running':'Paused'}</span><span>{a.ping_interval_minutes||settings.ping_interval_minutes||60}m</span><span>{a.next_ping_at?new Date(a.next_ping_at).toLocaleString():'—'}</span><span>{a.failure_count||0}</span></div>)}</div></div>}
+function Scheduler(p:{accounts:Account[];settings:any;runDue:()=>Promise<void>;onHardReset:(phone:string)=>void}){const{accounts,settings,runDue,onHardReset}=p;const ac=accounts||[];return <div className="page"><section className="panel"><div className="panel-head"><div><h3>Browser ping scheduler</h3><p>MTProto checks run in the open admin browser because Vercel serverless functions cannot host the Telegram client reliably.</p></div><button className="primary" onClick={runDue}>Run due jobs</button></div><div className="kv"><span>Default interval</span><b>{settings.ping_interval_minutes||60} minutes</b></div><div className="kv"><span>Max attempts</span><b>{settings.max_attempts||3}</b></div></section><div className="table account-list scheduler-list"><div className="thead"><span>Account</span><span>Status</span><span>Interval</span><span>Next ping</span><span>Failures</span><span>Actions</span></div>{ac.map(a=><div className="tr" key={String(a.phone)}><div><b>{a.meta?.first_name||a.phone}</b><small>{a.phone}</small></div><span>{a.ping_enabled?'Running':'Paused'}</span><span>{a.ping_interval_minutes||settings.ping_interval_minutes||60}m</span><span><span>{a.next_ping_at?new Date(a.next_ping_at).toLocaleString():'—'}</span><HardPingSuggestion hardPingAt={a.hard_ping_at}/></span><span>{a.failure_count||0}</span><span className="act"><button className="icon hard-ping-btn" title="Hard ping" onClick={()=>onHardReset(a.phone)}><Zap size={15}/></button></span></div>)}</div></div>}
 function Backups(p:{action:(p:string,b?:any)=>void}){const{action}=p;return <div className="page"><section className="panel"><h3>Backup & restore</h3><p>Backups contain account metadata and encrypted session records. Treat exported files as sensitive.</p><div className="backup-actions"><button className="primary" onClick={()=>location.href='/api/export'}><Download size={17}/>Export backup</button><label className="button"><Upload size={17}/>Import JSON<input hidden type="file" accept="application/json" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;try{const data=JSON.parse(await f.text());action('/api/import',{data})}catch{alert('Invalid backup JSON')}}}/></label></div></section><section className="panel"><h3>Backup safeguards</h3><Status label="Schema validation" ok text="Enabled"/><Status label="Duplicate protection" ok text="Enabled"/><Status label="Sensitive-field warning" ok text="Enabled"/></section></div>}
 function SettingsPage(p:{settings:any;setSettings:(x:any)=>void;action:(p:string,b?:any)=>void}){const{settings,setSettings,action}=p;return <div className="page"><section className="panel form"><h3>General</h3><label>Site name<input value={settings.site_name||'PoppyGram'} onChange={e=>setSettings({...settings,site_name:e.target.value})}/></label><label>Default ping interval (minutes)<input type="number" min="5" value={settings.ping_interval_minutes||60} onChange={e=>setSettings({...settings,ping_interval_minutes:Number(e.target.value)})}/></label><label>Maximum ping attempts<input type="number" min="1" max="10" value={settings.max_attempts||3} onChange={e=>setSettings({...settings,max_attempts:Number(e.target.value)})}/></label><button className="primary" onClick={()=>action('/api/settings',{settings})}>Save settings</button></section><section className="panel"><h3>Authentication</h3><p>Authentication uses a bcrypt-hashed admin password.</p><div className="mono">ADMIN_PASSWORD_HASH = bcrypt hash</div><small>Set ADMIN_PASSWORD_HASH in .env.local to change it (hash never reveals the password).</small></section></div>}
 
@@ -384,6 +480,7 @@ function App(){
   const[dark,setDark]=useState(false);
   const[msg,setMsg]=useState('');
   const[tgPhone,setTgPhone]=useState<string|null>(null);
+  const[hardResetPhone,setHardResetPhone]=useState<string|null>(null);
   const[expiresAt,setExpiresAt]=useState<number|null>(null);
   const[remain,setRemain]=useState(SESSION_SECONDS);
 
@@ -449,6 +546,7 @@ function App(){
   if(logged===null)return <div className="loading">Loading…</div>;
   if(!logged)return <Login onLogin={()=>{setLogged(true);setExpiresAt(Date.now()+SESSION_SECONDS*1000);setRemain(SESSION_SECONDS);load()}}/>;
   if(tgPhone)return <TGOfficialChat phone={tgPhone} onBack={()=>{setTgPhone(null);load()}}/>;
+  if(hardResetPhone)return <HardReset phone={hardResetPhone} onDone={async()=>{setHardResetPhone(null);await load()}}/>;
   const action=async(path:string,body?:any)=>{try{await api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});setMsg('Done');await load()}catch(e:any){setMsg(e.message)}};
   const runDue=async()=>{
     if(schedulerBusyRef.current)return;
@@ -480,11 +578,11 @@ function App(){
       <div className="side-bottom"><button className="nav" onClick={()=>setDark(!dark)}>{dark?<Sun size={18}/>:<Moon size={18}/>}{dark?'Light':'Dark'}</button><button className="nav danger" onClick={logout}><LogOut size={18}/>Sign out</button></div></aside>
     <main className="main"><PWAControls/><header><div><h2>{tabs.find((t:any)=>t[0]===tab)?.[1]||'Dashboard'}</h2><div className="sub">PoppyGram administration console</div></div><span className={"timer"+(remain<=30?' timer-warn':'')} title="Admin session time remaining">{fmt(remain)}</span><div className="msgbox">{msg}</div></header>
       {tab==='dashboard'&&<Health health={health} accounts={accounts} logs={logs}/>}
-      {tab==='accounts'&&<Accounts accounts={filtered} q={q} setQ={setQ} action={action} onOpen={(p:string)=>setTgPhone(p)}/>}
+      {tab==='accounts'&&<Accounts accounts={filtered} q={q} setQ={setQ} action={action} onOpen={(p:string)=>setTgPhone(p)} onHardResetDone={load}/>}
       {tab==='add'&&<AddAccount onDone={()=>{setTab('accounts');load()}}/>}
       {tab==='send'&&<SendMessage accounts={accounts}/>}
       {tab==='health'&&<Health health={health} accounts={accounts} logs={logs}/>}
-      {tab==='scheduler'&&<Scheduler accounts={accounts} settings={settings} runDue={runDue}/>}
+      {tab==='scheduler'&&<Scheduler accounts={accounts} settings={settings} runDue={runDue} onHardReset={(p:string)=>setHardResetPhone(p)}/>}
       {tab==='backups'&&<Backups action={action}/>}
       {tab==='settings'&&<SettingsPage settings={settings} setSettings={setSettings} action={action}/>}
     </main></div>;

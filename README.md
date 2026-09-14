@@ -81,3 +81,11 @@ The service worker deliberately does **not** cache `/api/*`, authentication/sess
 On Android/Chrome/Edge, use the **Install app** prompt when it appears. On iPhone/iPad Safari, use **Share → Add to Home Screen**.
 
 Important: installing PoppyGram as a PWA does not turn the browser-side Telegram/MTProto scheduler into a true background worker. Telegram account pings still require the PWA/site browser context to be running. A persistent server/worker is required for scheduling while the app is completely closed.
+
+
+## Hard Ping / Session Reset
+Each account has a three-state hard-ping label based on the last completed hard reset: **Excellent** for the first 30 days, **Suggested** from 30 to 60 days, and **Danger** after 60 days (or if never completed). Hard reset creates a fresh Telegram login session, verifies it, waits a 10-second safety cooldown, then atomically replaces the active encrypted session while retaining the previous encrypted session as backup. Login codes must be read and entered manually from Telegram; PoppyGram does not automatically intercept or mirror authentication codes.
+
+
+## Session backup history
+Hard Reset now appends the previous encrypted Telegram session to `account_session_backups` before replacing the active session. The legacy `previous_session_encrypted` field is retained for compatibility, but new resets use the separate history table.

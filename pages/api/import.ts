@@ -24,9 +24,14 @@ export default async function h(req:NextApiRequest,res:NextApiResponse){
     const failures=Number(x.failure_count);
     const encrypted=typeof x.session_encrypted==='string'&&x.session_encrypted?x.session_encrypted:null;
     if(encrypted&&!sessionRx.test(encrypted)){skipped++;continue;}
-    const safe={phone,label:String(x.label||'').slice(0,200),meta,status,ping_enabled:x.ping_enabled!==false,last_ping:x.last_ping||null,next_ping_at:x.next_ping_at||new Date().toISOString(),ping_interval_minutes:Number.isInteger(interval)&&interval>=5&&interval<=10080?interval:60,failure_count:Number.isInteger(failures)&&failures>=0&&failures<=100?failures:0,session_encrypted:encrypted,updated_at:new Date().toISOString()};
+    const safe={phone,label:String(x.label||'').slice(0,200),meta,status,ping_enabled:x.ping_enabled!==false,last_ping:x.last_ping||null,next_ping_at:x.next_ping_at||new Date().toISOString(),ping_interval_minutes:Number.isInteger(interval)&&interval>=5&&interval<=10080?interval:60,failure_count:Number.isInteger(failures)&&failures>=0&&failures<=100?failures:0,session_encrypted:encrypted,hard_ping_at:x.hard_ping_at||null,previous_session_encrypted:typeof x.previous_session_encrypted==='string'&&x.previous_session_encrypted?x.previous_session_encrypted:null,updated_at:new Date().toISOString()};
     const {error}=await db.from('accounts').insert(safe);
-    if(!error) imported++; else skipped++;
+    if(!error){
+      if(safe.previous_session_encrypted){
+        await db.from('account_session_backups').insert({phone,session_encrypted:safe.previous_session_encrypted,captured_at:safe.hard_ping_at||new Date().toISOString(),reason:'legacy_import',verified:true});
+      }
+      imported++;
+    } else skipped++;
   }
   const {error:logError}=await db.from('audit_logs').insert({event:'backup.imported',message:`Imported ${imported} account(s), skipped ${skipped}`});
   if(logError)console.error('[audit]',logError);

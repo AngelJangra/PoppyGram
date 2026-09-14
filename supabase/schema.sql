@@ -7,10 +7,29 @@ create table if not exists accounts(
  phone text primary key, label text default '', meta jsonb not null default '{}'::jsonb,
  session_encrypted text, status text not null default 'pending', ping_enabled boolean not null default true,
  last_ping timestamptz, next_ping_at timestamptz, ping_interval_minutes integer not null default 60,
- failure_count integer not null default 0, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+ failure_count integer not null default 0, hard_ping_at timestamptz, previous_session_encrypted text, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 create index if not exists accounts_next_ping_idx on accounts(ping_enabled,next_ping_at);
 create index if not exists accounts_status_idx on accounts(status);
+
+-- Permanent encrypted Telegram session history. Each successful Hard Reset
+-- appends the previous active session here instead of overwriting a single backup.
+create table if not exists account_session_backups (
+  id bigint generated always as identity primary key,
+  phone text not null references accounts(phone) on delete cascade,
+  session_encrypted text not null,
+  captured_at timestamptz not null default now(),
+  reason text not null default 'hard_reset',
+  verified boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists account_session_backups_phone_idx
+  on account_session_backups(phone, captured_at desc);
+
+create index if not exists account_session_backups_created_idx
+  on account_session_backups(created_at desc);
+
 create table if not exists audit_logs(id bigint generated always as identity primary key,event text not null,message text,created_at timestamptz not null default now());
 create index if not exists audit_logs_created_idx on audit_logs(created_at desc);
 
@@ -50,3 +69,12 @@ alter table audit_logs enable row level security;
 alter table settings enable row level security;
 alter table login_sessions enable row level security;
 alter table processed_updates enable row level security;
+alter table account_session_backups enable row level security;
+
+-- Hard reset metadata: the latest session replaces the active session, while the previous encrypted session is retained as a recovery backup.
+alter table accounts add column if not exists hard_ping_at timestamptz;
+alter table accounts add column if not exists previous_session_encrypted text;
+
+
+-- Existing previous_session_encrypted is retained for backward compatibility.
+-- New Hard Reset operations use account_session_backups as the permanent history.
