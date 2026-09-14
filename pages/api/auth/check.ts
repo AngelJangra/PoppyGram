@@ -1,0 +1,1 @@
+import type {NextApiRequest,NextApiResponse} from 'next';import {isAdmin,sessionExpiryMs} from '../../../lib/adminAuth';export default function h(req:NextApiRequest,res:NextApiResponse){const ok=isAdmin(req);res.setHeader('Cache-Control','no-store');res.json({loggedIn:ok,expiresAt:ok?sessionExpiryMs(req):null})}

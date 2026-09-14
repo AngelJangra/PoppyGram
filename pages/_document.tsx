@@ -1,0 +1,1 @@
+import Document,{Html,Head,Main,NextScript} from 'next/document';export default class Doc extends Document{render(){return <Html lang="en"><Head><link rel="icon" href="/poppygram.png" type="image/png"/><link rel="apple-touch-icon" href="/poppygram.png"/></Head><body><Main/><NextScript/></body></Html>}}

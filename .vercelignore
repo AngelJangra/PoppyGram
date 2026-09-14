@@ -1,0 +1,9 @@
+node_modules
+.next
+.vercel
+.env
+.env.*
+PoppyGram-v2.zip
+PoppyGram-v3.zip
+CHATGPT
+*.log

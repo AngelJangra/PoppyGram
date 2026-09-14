@@ -1,0 +1,4 @@
+import crypto from 'crypto';
+const key=()=>{const k=Buffer.from(process.env.ENCRYPTION_KEY_BASE64_32_BYTES||'','base64');if(k.length!==32)throw new Error('ENCRYPTION_KEY_BASE64_32_BYTES must decode to 32 bytes');return k};
+export function encrypt(value:string){const iv=crypto.randomBytes(12);const c=crypto.createCipheriv('aes-256-gcm',key(),iv);const out=Buffer.concat([c.update(value,'utf8'),c.final()]);return [iv.toString('base64'),c.getAuthTag().toString('base64'),out.toString('base64')].join('.')}
+export function decrypt(value:string){const [iv,tag,data]=value.split('.');const d=crypto.createDecipheriv('aes-256-gcm',key(),Buffer.from(iv,'base64'));d.setAuthTag(Buffer.from(tag,'base64'));return Buffer.concat([d.update(Buffer.from(data,'base64')),d.final()]).toString('utf8')}
