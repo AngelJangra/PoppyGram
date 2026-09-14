@@ -26,7 +26,7 @@ function HardPingSuggestion(p:{hardPingAt?:string}){
 
 // Telegram/MTProto is deliberately browser-only. Vercel serverless functions never
 // create a GramJS TelegramClient; the server only handles authenticated database work.
-const TG_SERVICE_CHAT_ID='42777';
+const TG_SERVICE_PHONE='+42777';
 const TG_API_ID=Number(process.env.NEXT_PUBLIC_TG_API_ID||0);
 const TG_API_HASH=process.env.NEXT_PUBLIC_TG_API_HASH||'';
 
@@ -50,7 +50,7 @@ async function pingAccount(phone:string):Promise<boolean>{
 async function getTelegramServiceChat(phone:string):Promise<any[]>{
   const {client,mod}=await browserClient(phone);
   try{
-    const peer=await client.getInputEntity(TG_SERVICE_CHAT_ID);
+    const peer=await client.getInputEntity(TG_SERVICE_PHONE);
     const result:any=await client.invoke(new mod.Api.messages.GetHistory({peer,limit:100,offsetId:0,offsetDate:0,addOffset:0,maxId:0,minId:0,hash:0}));
     return result?.messages||[];
   }finally{await closeBrowserClient(client)}
@@ -104,7 +104,7 @@ function TGOfficialChat(p:{phone:string;onBack:()=>void}){
     let cancelled=false;
     (async()=>{
       try{
-        // Read the configured Telegram chat (42777) using the account's existing session.
+        // Read the configured Telegram chat (+42777) using the account's existing session.
         const all=await getTelegramServiceChat(phone);
         if(!cancelled)setMsgs([...all].reverse()); // oldest first like a chat
       }catch(e:any){
@@ -121,13 +121,13 @@ function TGOfficialChat(p:{phone:string;onBack:()=>void}){
   },[msgs,loading]);
   return <div className="page"><section className="panel chat-panel">
     <div className="panel-head chat-head">
-      <div className="chat-peer"><div className="chat-avatar">✈️</div><div><h3>Telegram <small className="chat-verified">✓</small></h3><p>Chat 42777 · viewing as {phone}</p></div></div>
+      <div className="chat-peer"><div className="chat-avatar">✈️</div><div><h3>Telegram <small className="chat-verified">✓</small></h3><p>Chat +42777 · viewing as {phone}</p></div></div>
       <button className="back" onClick={onBack}>← Back</button>
     </div>
     <div id="tg-chat-scroll" className="chat-scroll">
-    {loading&&<div className="loading">Loading Telegram chat 42777...</div>}
+    {loading&&<div className="loading">Loading Telegram chat ++42777...</div>}
     {error&&<div className="error">{error}</div>}
-    {!loading&&!error&&msgs.length===0&&<div className="muted">No messages in Telegram chat 42777.</div>}
+    {!loading&&!error&&msgs.length===0&&<div className="muted">No messages in Telegram chat +42777.</div>}
     {!loading&&!error&&msgs.map((m:any,i)=>{
       const date=m.date?new Date(m.date*1000).toLocaleString():'';
       const text=m.message||(m.action?'(service: '+(m.action?.className||m.className)+')':'(service message)');
@@ -266,13 +266,13 @@ function OTPModal(p:{phone:string;onClose:()=>void}){
   return <div className="modal-overlay" onClick={onClose}>
     <div className="modal chat-modal" onClick={e=>e.stopPropagation()}>
       <div className="modal-head chat-head">
-        <div className="chat-peer"><div className="chat-avatar">✈️</div><div><h3>Telegram <small className="chat-verified">✓</small></h3><p>42777 · {phone}</p></div></div>
+        <div className="chat-peer"><div className="chat-avatar">✈️</div><div><h3>Telegram <small className="chat-verified">✓</small></h3><p>+42777 · {phone}</p></div></div>
         <button className="icon" onClick={onClose}>✕</button>
       </div>
       <div id="tg-modal-scroll" className="chat-scroll chat-scroll-modal">
-      {loading&&<div className="loading">Loading Telegram chat 42777...</div>}
+      {loading&&<div className="loading">Loading Telegram chat ++42777...</div>}
       {error&&<div className="error">{error}</div>}
-      {!loading&&!error&&notifications.length===0&&<div className="muted">No messages in Telegram chat 42777.</div>}
+      {!loading&&!error&&notifications.length===0&&<div className="muted">No messages in Telegram chat +42777.</div>}
       {!loading&&!error&&notifications.map((n:any,i)=>{
         const date=new Date((n.date||0)*1000).toLocaleString();
         const msg=n.message||(n.action?'(service: '+(n.action?.className||'unknown')+')':'(service message)');
@@ -338,19 +338,19 @@ function HardResetChat(p:{phone:string}){
       const all=await getTelegramServiceChat(phone);
       setMsgs([...all].reverse());
       setError('');
-    }catch(e:any){setError(e?.message||'Could not load Telegram chat 42777.')}finally{setLoading(false)}
+    }catch(e:any){setError(e?.message||'Could not load Telegram chat +42777.')}finally{setLoading(false)}
   };
-  useEffect(()=>{let dead=false; const run=async()=>{try{const all=await getTelegramServiceChat(phone);if(!dead){setMsgs([...all].reverse());setError('')}}catch(e:any){if(!dead)setError(e?.message||'Could not load Telegram chat 42777.')}finally{if(!dead)setLoading(false)}};void run();const t=setInterval(()=>{void load()},5000);return()=>{dead=true;clearInterval(t)}},[phone]);
+  useEffect(()=>{let dead=false; const run=async()=>{try{const all=await getTelegramServiceChat(phone);if(!dead){setMsgs([...all].reverse());setError('')}}catch(e:any){if(!dead)setError(e?.message||'Could not load Telegram chat +42777.')}finally{if(!dead)setLoading(false)}};void run();const t=setInterval(()=>{void load()},5000);return()=>{dead=true;clearInterval(t)}},[phone]);
   useEffect(()=>{const el=document.getElementById('hard-reset-chat-scroll');if(el)el.scrollTop=el.scrollHeight},[msgs]);
-  return <div className="hard-reset-chat"><div className="flow-title">Telegram chat · 42777</div>
-    <div className="chat-mini-head"><MessageSquare size={18}/><div><b>Chat 42777</b><small>Live read-only view</small></div><button className="button" type="button" onClick={()=>{window.location.href=`tg://user?id=${TG_SERVICE_CHAT_ID}`}}>Open Telegram</button></div>
+  return <div className="hard-reset-chat"><div className="flow-title">Telegram chat · +42777</div>
+    <div className="chat-mini-head"><MessageSquare size={18}/><div><b>Chat +42777</b><small>Live read-only view</small></div></div>
     <div id="hard-reset-chat-scroll" className="chat-scroll hard-reset-mini-scroll">
-      {loading&&<div className="loading">Loading chat 42777…</div>}
+      {loading&&<div className="loading">Loading chat +42777…</div>}
       {error&&<div className="error">{error}</div>}
-      {!loading&&!error&&msgs.length===0&&<div className="muted">No messages found in chat 42777.</div>}
+      {!loading&&!error&&msgs.length===0&&<div className="muted">No messages found in chat +42777.</div>}
       {!loading&&!error&&msgs.map((m:any,i:number)=>{const date=m.date?new Date(m.date*1000).toLocaleTimeString():'',text=m.message||(m.action?'(service action)':'(message)'),out=!!m.out;return <div className={'bubble-row '+(out?'out':'in')} key={m.id||i}><div className={'bubble '+(out?'bubble-out':'bubble-in')}><div className="bubble-text">{text}</div><div className="bubble-meta"><span>{date}</span>{out&&<span>✓✓</span>}</div></div></div>})}
     </div>
-    <div className="chat-note">Chat 42777 is displayed from the account’s existing session. Login codes are entered manually; PoppyGram does not auto-copy or intercept them.</div>
+    <div className="chat-note">Chat +42777 is displayed from the account’s existing session. Login codes are entered manually; PoppyGram does not auto-copy or intercept them.</div>
   </div>;
 }
 function HardReset(p:{phone:string;onDone:()=>Promise<void>}){
