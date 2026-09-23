@@ -4,10 +4,21 @@ import Document,{Html,Head,Main,NextScript} from 'next/document';
 // Raw HTML in the FIRST server response (before any JS runs), so the animation
 // is visible on every page load — including slow networks and the hydration
 // gap where previously nothing was shown. No text: the video IS the screen.
+// Centered mid-size logo animation + shimmer bar (standard modern loading
+// layout). Video stays small in the middle — never full-bleed.
 const SPLASH_STYLE=[
-  '#pg-boot{position:fixed;inset:0;z-index:2147483000;background:#0b0712;',
+  '#pg-boot{position:fixed;inset:0;z-index:2147483000;',
+  'background:radial-gradient(circle at 50% 35%,#1c1030,#0b0712 70%);',
+  'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;',
   'opacity:1;transition:opacity .55s ease;pointer-events:none}',
-  '#pg-boot video{display:block;width:100%;height:100%;object-fit:cover}',
+  '#pg-boot video{display:block;width:min(40vw,160px);max-height:38vh;height:auto;',
+  'border-radius:16px;object-fit:contain}',
+  '#pg-boot .pg-bar{width:132px;height:4px;border-radius:99px;background:#ffffff1a;',
+  'overflow:hidden;position:relative}',
+  '#pg-boot .pg-bar i{position:absolute;top:0;left:-40%;width:40%;height:100%;',
+  'border-radius:99px;background:linear-gradient(90deg,#7c3aed,#db2777);',
+  'animation:pg-slide 1.1s ease-in-out infinite}',
+  '@keyframes pg-slide{0%{left:-40%}100%{left:100%}}',
   '#pg-boot.pg-hide{opacity:0;visibility:hidden}'
 ].join('');
 
@@ -32,7 +43,7 @@ const SPLASH_SCRIPT=[
 
 // Literal attributes (autoplay/muted/loop/playsinline) must be in the served
 // HTML for mobile autoplay policies — hence raw HTML, not React props.
-const SPLASH_HTML='<video src="/poppygram.mp4" autoplay muted loop playsinline preload="auto"></video>';
+const SPLASH_HTML='<video src="/poppygram.mp4" autoplay muted loop playsinline preload="auto"></video><div class="pg-bar"><i></i></div>';
 
 export default class Doc extends Document{
   render(){return <Html lang="en"><Head>

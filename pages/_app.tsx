@@ -3,10 +3,21 @@ import type {AppProps} from 'next/app';
 import {useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/router';
 
+// Same centered mid-size layout as the boot splash: small video in the
+// middle + gradient shimmer bar, dark radial backdrop, no text.
 const ROUTE_STYLE=[
-  '.pg-route-splash{position:fixed;inset:0;z-index:2147483000;background:#0b0712;',
+  '.pg-route-splash{position:fixed;inset:0;z-index:2147483000;',
+  'background:radial-gradient(circle at 50% 35%,#1c1030,#0b0712 70%);',
+  'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;',
   'pointer-events:none;animation:pg-splash-in .22s ease both}',
-  '.pg-route-splash video{display:block;width:100%;height:100%;object-fit:cover}',
+  '.pg-route-splash video{display:block;width:min(40vw,160px);max-height:38vh;height:auto;',
+  'border-radius:16px;object-fit:contain}',
+  '.pg-route-splash .pg-bar{width:132px;height:4px;border-radius:99px;background:#ffffff1a;',
+  'overflow:hidden;position:relative}',
+  '.pg-route-splash .pg-bar i{position:absolute;top:0;left:-40%;width:40%;height:100%;',
+  'border-radius:99px;background:linear-gradient(90deg,#7c3aed,#db2777);',
+  'animation:pg-slide 1.1s ease-in-out infinite}',
+  '@keyframes pg-slide{0%{left:-40%}100%{left:100%}}',
   '@keyframes pg-splash-in{from{opacity:0}to{opacity:1}}'
 ].join('');
 
@@ -21,6 +32,7 @@ function NavSplash(){
   },[]);
   return <div className="pg-route-splash" aria-hidden="true">
     <video ref={ref} src="/poppygram.mp4" autoPlay muted loop playsInline preload="auto"/>
+    <div className="pg-bar"><i/></div>
   </div>;
 }
 
