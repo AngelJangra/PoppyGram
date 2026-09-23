@@ -1,0 +1,466 @@
+POPPYGRAM v3.7.0 - WEBSITE GUIDE + UPDATE NOTES (Bot Fixes)
+Date: 2026-09-23
+================================================================
+
+1. WHAT IS POPPYGRAM?
+---------------------
+Next.js 14 + Supabase + Telegram hybrid app with two halves:
+
+A) ADMIN CONSOLE (pages/index.tsx)
+- Password-gated dashboard (ADMIN_PASSWORD_HASH, 24h signed cookie).
+- Manages Telegram USER accounts (MTProto StringSessions).
+- RULE: all MTProto runs in ADMIN BROWSER via GramJS. Vercel never
+  creates TelegramClient. /api/tg/* returns 410 on purpose.
+- Browser scheduler: while dashboard open, browser polls /api/ping-all
+  for due accounts and pings one by one. Closing browser stops pings.
+- Features: health, accounts, add/remove/toggle-ping, ping, hard-reset
+  (archives to account_session_backups), service-chat reader (777000),
+  send-message, settings (global_credit, ping_interval_minutes),
+  export/import, logs, sign-out-all.
+
+B) TELEGRAM STORE BOT (pages/api/bot.ts webhook on Vercel)
+- Real file store: admin uploads Telegram document, bot stores only
+  file_id + name + price + description in store_products. Binary stays
+  on Telegram servers.
+- Wallet per user (bot_users.credit). New users start 0, get
+  global_credit (default 100) once after /auth.
+- Owner = @drangeljangra (hardcoded + seeded). /addadmin @user adds more.
+- Admins UNLIMITED; normal users pay per file; failed delivery = refund.
+- Hybrid /auth: bot collects phone, issues 10-min ticket
+  (bot_login:{token}, AES-GCM encrypted), user opens /botlogin?t=TOKEN,
+  browser does sendCode/signIn/2FA (password never leaves browser),
+  POSTs session to /api/bot-verify which saves accounts + marks
+  bot_users.auth_verified=true.
+
+Tables: accounts (permanent), account_session_backups, settings (KV:
+bot_state:{chat}, bot_login:{token}, store_upload:{chat}:{user},
+global_credit), bot_users, bot_admins, store_products, store_purchases,
+processed_updates (idempotency), audit_logs.
+RPCs: purchase_store_product, claim_free_credits (24h), change_bot_credit.
+
+2. NEW UPDATE - ALL BOT WORKFLOW FIXES
+---------------------------------------
+CRITICAL / AUTH:
+[FIX-01] store_upload key now store_upload:{chat}:{user} with legacy fallback.
+[FIX-02] deleteBotMemory chat-aware, clears both chat and user keys.
+[FIX-03] /cancel + new commands revoke pending bot_login ticket.
+[FIX-04] /auth PRIVATE-CHAT ONLY. Group auth refused.
+[FIX-05] Phone-takeover blocked: ownership checked BEFORE upsert (409).
+[FIX-06] completeLogin validates BEFORE writing accounts (400 mappings).
+[FIX-07] ensureGlobalCredit insert-only, never resets custom value.
+[FIX-08] accounts.meta.credit re-synced after grant.
+[FIX-09] New-wallet signup grant fixed (was 0, now paid).
+[FIX-10] /deleteaccount unlinks auth_owner_tg_id so no resurrection.
+
+PAYMENTS / STORE:
+[FIX-11] purchase checks product BEFORE charge + price guard + refund.
+[FIX-12] Delivery-fail refund also deletes ghost purchase row.
+[FIX-13] Caption parsing strict, no accidental free products.
+[FIX-14] Search sanitized, no OR-injection.
+[FIX-15] Two-tap buy: confirmbuy:{id}:{price} then buy:{id}:{price}.
+
+ROUTING / UX:
+[FIX-16] commandPath strips @BotName, lowercases.
+[FIX-17] Webhook ignores edited/channel/sticker without consuming id.
+[FIX-18] Captions read (text||caption), empty/command rejected.
+[FIX-19] /auth clears upload, /addfile clears auth.
+[FIX-20] productCard escapeHtml(F()) order fixed.
+
+RELIABILITY / OPS:
+[FIX-21] api() 15s timeout + retry_after once. No silent FLOOD_WAIT loss.
+[FIX-22] Admin cache cleared on add/remove/username change.
+[FIX-23] rememberAdminChat on every message for announcements.
+[FIX-24] /status shows true pending count (removed -1).
+[FIX-25] setWebhook drop_pending default false (?drop=true to wipe).
+[FIX-26] clearAllFlows allSettled, never fails whole command.
+[FIX-27] botlogin safe resend + /profile-repair guidance (no FLOOD loop).
+[FIX-28] /profile dedup by phone, limit 50, real status list.
+[FIX-29] /addcredit capped 1000000, errors friendly, no negative drain.
+[FIX-30] Group chatter silent (empty reply skipped).
+
+3. HOW TO USE
+-------------
+Users: /start /store /search kw /product id (tap Confirm twice)
+ /balance /history /profile /freecredits (100/24h, auth req)
+/auth (private only) /cancel /deleteaccount /support /help
+Admins: /admin /status /addfile (doc + "Name | Price | Desc")
+ /products /delproduct ID /restoreproduct ID /setprice /addcredit @user|ID AMT /users
+ /verify ID /unverify ID
+Owner: /addadmin @user /removeadmin @user /admins
+Setup: POST /api/bot-setup Bearer CRON_SECRET (?drop=true to wipe queue)
+
+4. FILES CHANGED
+----------------
+lib/bot.ts, lib/botFlow.ts, lib/storeFlow.ts, pages/api/bot.ts,
+pages/api/bot-verify.ts, pages/api/bot-setup.ts, pages/botlogin.tsx
+Typecheck: PASS (tsc --noEmit exit 0).
+New helpers: deleteLoginTicketsForChat, get/set/clearUploadPending,
+clearAdminCacheFor. purchase(u,id,expectedPrice?). New callback:
+confirmbuy:{id}:{price}.
+
+5. LATEST UPDATE (v3.7.1) - SUPPORT, RESTORE, SETUP AUTH
+--------------------------------------------------------
+[NEW] SUPPORT SECTION
+- Support bot handle: @poppygramsupportbot (constant SUPPORT_BOT in
+  pages/api/bot.ts; change it there if support ever moves).
+- /support (alias /contact) replies with a SUPPORT CENTER card:
+  support bot handle, owner handle, what support covers (payment/credit
+  problems, files that will not open or download, account auth problems,
+  bug / missing product reports), response-time note, and finally
+  YOUR TELEGRAM ID so the user can paste it straight into support chat.
+- Inline button "Chat with @poppygramsupportbot" opens
+  https://t.me/poppygramsupportbot.
+- Reachable from every entry point: /support, /contact, /start keyboard,
+  /help keyboard, and the Help inline callback.
+- Added to the Telegram command menu: /support - Contact PoppyGram
+  support (verified live via getMyCommands).
+
+[NEW] /restoreproduct (alias /restore)
+- /delproduct ID is a SOFT delete: store_products.active=false. The row,
+  file_id and purchase history are kept.
+- New /restoreproduct ID (or /restore ID) sets active=true, so the file
+  reappears in /store immediately.
+- /delproduct reply now prints the exact restore command for that ID.
+- /products lists hidden rows with a red dot so the ID is easy to find.
+
+[FIX] /addcredit @username AMOUNT
+- Before: exact case-sensitive username match only, so users with no
+  username, a renamed handle or different capitalisation were reported
+  as "That user has not started the bot yet".
+- Now: accepts a numeric Telegram ID (works without any username),
+  matches usernames case-insensitively, and when nothing matches it
+  returns USER NOT FOUND plus up to 5 "Did you mean" suggestions and a
+  reminder that the user must press Start first.
+- Amount stays capped at 1000000 and negative values are rejected.
+
+[FIX] /api/bot-setup was unreachable in production
+- middleware.ts now authorises /api/bot-setup (and /api/ping-all) with
+  the CRON_SECRET bearer token. Previously the documented setup call
+  returned 401 "Unauthorized - whole site is pass protected", so the
+  webhook and the Telegram command menu could not be refreshed after a
+  deploy even though /api/bot-setup was written for exactly that.
+- /api/bot-setup still verifies the same secret inside the handler, so
+  no unauthenticated access is possible.
+
+DEPLOYED
+- Production: https://poppygram.vercel.app (Vercel project: poppygram).
+- Telegram command menu: 10 commands incl. /support (getMyCommands ok).
+- Typecheck: PASS (tsc --noEmit exit 0).
+
+6. LATEST UPDATE (v3.8.0) - CREDITS, /editproduct, PRODUCT PHOTOS
+---------------------------------------------------------------
+[NEW] CREDITS - GITHUB @AngelJangra
+- /start and /help now end with a credits block:
+      ✦ ━━━━━━━━━━━━━ ✦
+      👑 Developed by / Made by: @drangeljangra
+      🐙 GitHub: github.com/AngelJangra
+- github.com/AngelJangra is a real tappable link (Telegram auto-links
+  bare URLs; previews stay disabled for a clean card).
+- One file drives every credit surface: lib/credits.ts
+      PROJECT_NAME='PoppyGram'   OWNER_NAME='drangeljangra'
+      GITHUB_USERNAME='AngelJangra'
+      GITHUB_URL='https://github.com/AngelJangra'
+      SUPPORT_BOT='poppygramsupportbot'
+  Change the handle there and every response, caption, card and button
+  updates automatically (see Update 3, section 1 for the full detail).
+- The footer is applied centrally by lib/bot.ts, so EVERY reply gets it
+  exactly once (marker-guarded, message length trimmed to 4096).
+
+[NEW] /editproduct - edit any product without re-uploading it
+Usage:  /editproduct <ID>
+Replies with one button per action:
+
+  1  ✏️ Name          -> send any text message = new name
+  2  📝 Description   -> send any text message = new description
+  3  💰 Price         -> send a number (e.g. 49) = new price
+  4  📎 Replace file  -> send the new document (name/price/description kept)
+  5  🖼️ Set photo     -> send a photo  (shows on the product page)
+  6  🗑️ Hide from store -> same as /delproduct
+  7  ♻️ Show in store   -> same as /restoreproduct
+
+Callbacks: edit:{id}  editfield:{id}:{name|desc|price}  editdoc:{id}
+           editphoto:{id}  edithide:{id}  editshow:{id}
+
+The chosen action is stored in the settings table as
+`product_edit:{chatId}:{userId}` (JSON {id,mode,field}) so a multi-step
+edit survives between messages, exactly like the auth and upload flows.
+/cancel closes an edit session without changing anything.
+
+Validation: name cannot be empty (max 120 chars), description max 1000
+chars, price must be a finite number 0..1000000. Options 4 and 5 reuse
+the same caption parser and whitelist as /addfile, so a bad caption is
+rejected with a readable reason instead of silently creating junk.
+
+[NEW] PRODUCT PHOTOS - image visible when the product is opened
+- Attach a photo with /editproduct ID -> 🖼️ Set photo. Then tapping the
+  product in /store, and /product ID, replies with a REAL Telegram photo
+  (sendPhoto) whose caption is the product card (name, price, description)
+  plus the same buy buttons.
+- Implementation: Telegram message photos carry exactly one image, so the
+  card text is used as the photo caption (Telegram caps captions at 1024
+  chars - sendPhoto() trims defensively). Products without a photo keep
+  sending a normal text card, so nothing changes for them.
+- Storage: store_products has no photo column and adding one would need a
+  manual migration on the live database, so photos are kept in the
+  existing settings KV table as `product_photo:{product_id}` = file_id,
+  the same pattern already used by bot_state / store_upload / bot_login.
+  Only the Telegram file_id is stored (a few hundred bytes) - the image
+  itself stays on Telegram's servers and is reused for every buyer.
+- getProductPhotoMap() loads every photo in ONE query and the /store list
+  gets a 🖼️ marker next to products that have a preview.
+- To remove a photo: /editproduct ID -> 🖼️ Set photo, then /cancel
+  (or overwrite it with a different image).
+
+7. BUGS FOUND AND FIXED WHILE BUILDING v3.8.0
+---------------------------------------------
+[B-1] Photos were dropped by the webhook before routing
+- The /api/bot entry point only accepted messages where text was a string
+  or a document was present, so any photo message was answered with
+  {"ok":true,"ignored":true} and never reached the handler. Photo uploads
+  and the new /editphoto step were unreachable.
+- Fix: the filter now also accepts messages that carry `photo` or a
+  `caption`.
+
+[B-2] Caption-only messages were ignored
+- A document/photo sent with only a caption and no text was filtered out
+  earlier in some paths. handleMessage() already read `msg.caption`, so
+  those messages now route normally.
+
+[B-3] An earlier single-step edit path left a product file-less
+- An experimental edit flow wrote name/price/description without a
+  file_id, so a Telegram file_id could end up NULL and downloading that
+  product would fail even though the row looked valid.
+- Fix: updateProduct() only ever writes the file fields when a real
+  file_id is supplied, so a metadata-only edit can no longer damage an
+  existing file. Any product created during that experiment should be
+  re-attached once with /editproduct ID -> 📎 Replace file (or option 5
+  caption) to restore its file.
+
+[B-4] /start or /help wiped an in-progress edit session
+- The central "a new command cancels the previous flow" guard also ran
+  for /start, /help, /support, /store, /balance, /products, /users,
+  /status and /admin, so tapping Help in the middle of an edit silently
+  destroyed the pending action.
+- Fix: those navigation commands (plus /editproduct and /addfile, which
+  re-create their own state) are excluded from the guard. Real state
+  changes - /auth, /cancel, /profile and friends - still reset everything.
+
+[B-5] "/unknown command" for a mention with arguments
+- args() sliced the raw text, so "/product@PoppyBot 3" returned
+  "@PoppyBot 3" as the first argument. /product worked only by accident
+  because it strips "@" manually, while other commands could misread it.
+- Fix: args() now strips the @BotName suffix itself, so every command
+  works identically in private chats and in groups.
+
+[B-6] A product with a nested <code> inside <b> broke the edit card
+- The edit card wrapped the product name and its ID in markup that put a
+  <code> tag inside a bold tag; Telegram rejects part of that nesting.
+- Fix: the card now renders the name in <b> and the ID in <code>
+  separately.
+
+8. SECURITY NOTE ADDED IN v3.8.0
+--------------------------------
+[GUARD] /api/bot only accepts updates when TG_BOT_WEBHOOK_SECRET is set
+- If that variable is missing the route answered 500 for every update
+  (a silently dead bot) while the attacker-controlled body was still
+  parsed. It now returns 500 only as a misconfiguration error and never
+  processes the update, and a wrong secret returns 403 (verified live).
+
+[GUARD] Removed the temporary endpoints
+- Two one-shot diagnostic routes used during this update
+  (env/secret presence probe and command-menu registration) were deleted
+  from middleware.ts. Both are gone from production (they now fall
+  through to the admin gate and return 401 - verified after deploy).
+
+[VERIFIED AFTER DEPLOY] https://poppygram.vercel.app
+- /api/bot without the secret -> 403 (handler rejects, not the gate)
+- /botlogin?t=...            -> 200 (public for Telegram users)
+- /                        -> 200 (login screen)
+- /api/accounts              -> 401 (admin cookie required)
+- /api/_cmds and /api/_diag  -> 401 (diagnostics removed)
+- Telegram command menu      -> 10 commands incl. /support
+- Typecheck: PASS (tsc --noEmit exit 0)
+
+9. FILES CHANGED IN v3.8.0
+--------------------------
+pages/api/bot.ts    credits block, /editproduct + callbacks, edit flow,
+                    photo routing (photo field on the reply), args()
+                    @BotName fix, navigation-command guard fix, updated
+                    /help and ADMIN_HELP text.
+lib/storeFlow.ts    sendPhoto support path: get/setProductPhoto,
+                    getProductPhotoMap, getProductAny, updateProduct
+                    (whitelisted patch), exported parseProductCaption.
+lib/bot.ts          new sendPhoto() + shared keyboard() helper,
+                    sendDocument/sendMessage refactored to use it.
+
+
+
+==============================================================================
+UPDATE 3 — AUTHOR CREDITS, SUPPORT SECTION, /editproduct, PRODUCT PHOTOS
+==============================================================================
+
+1. AUTHOR CREDITS ON EVERY BOT RESPONSE  (GitHub: AngelJangra)
+------------------------------------------------------------------------------
+- New file lib/credits.ts is the single source of truth:
+    PROJECT_NAME='PoppyGram', OWNER_NAME='drangeljangra',
+    GITHUB_USERNAME='AngelJangra',
+    GITHUB_URL='https://github.com/AngelJangra',
+    SUPPORT_BOT='poppygramsupportbot', SUPPORT_URL='https://t.me/...'
+    creditLine(), creditButtons(), withCredit(), creditsCard()
+- Every bot message now ends with a linked credit line:
+    "Powered by AngelJangra"  ->  https://github.com/AngelJangra
+- The footer is appended EXACTLY ONCE per message (a marker guard prevents
+  double footers) and is auto-trimmed, so a message already at Telegram's
+  4096-character limit can never fail with "message is too long".
+- Photo captions carry a compact one-line credit too, so product photos are
+  branded as well.
+- Internal/transport replies can opt out with {credit:false}.
+- New command /credits (aliases /credit, /developer, /about) shows the
+  PROJECT CREDITS card: project, developer, GitHub link, owner, support bot,
+  plus "Star the project on GitHub".
+  Buttons: [GitHub - AngelJangra] [Support] [Open Store]
+- The GitHub + Support buttons are also reachable from /start, /help and the
+  About/credits callback button.
+
+2. SUPPORT SECTION
+------------------------------------------------------------------------------
+- /support (alias /contact) shows the SUPPORT CENTER card:
+    support bot  @poppygramsupportbot
+    owner        @drangeljangra
+    what to report: payment/credit problems, files that will not open or
+    download, account authentication problems, bug/missing product reports
+    reply-time note ("usually within a few hours")
+    reminder to include your Telegram ID + a screenshot
+    the caller's own Telegram ID (copy/paste ready)
+- Button [Chat with @poppygramsupportbot] is a t.me URL button, so it opens
+  the support chat in one tap.
+- Reachable from /start, /help, the "support" callback and the Help buttons.
+- The handle is defined once in lib/credits.ts - change it there and every
+  card, button and footer updates everywhere.
+
+3. /editproduct — EDIT ALMOST ANYTHING ABOUT A PRODUCT
+------------------------------------------------------------------------------
+Command forms:
+    /editproduct              -> product list + usage help
+    /editproduct ID           -> interactive edit menu (inline buttons)
+    /editproduct ID name NEW NAME
+    /editproduct ID price 50
+    /editproduct ID desc NEW DESCRIPTION
+    /editproduct ID photo     -> then send the new photo
+    /editproduct ID clearphoto   (alias removephoto)
+    /editproduct ID file      -> then send the replacement document
+    /editproduct ID caption   -> then re-send the document with
+                                 "Name | Price | Description"
+    /editproduct ID on|off    -> show/hide in the store
+Interactive menu buttons (callback epf:{id}:{field}):
+    Name | Price | Description | Photo | File | File + Caption |
+    Add/Remove photo | Show/Hide in store | Close
+    (plus an "Edit again" button after each action)
+Safety and behaviour:
+    - admin only, checked both on the command and on every callback
+    - hidden products can be edited too (getProductAny, not getProduct)
+    - each edit session is chat+user scoped and is closed by /cancel or by
+      starting any other command
+    - photo / file / caption wait states are evaluated BEFORE the /auth phone
+      state, so a photo or caption can never be misread as a phone number
+    - updateProduct() whitelists the fields it accepts and validates them
+      (name 1-120 chars, description <=1000, price 0-1000000, non-empty
+      file_id), so no arbitrary object can ever reach the table
+    - /products now shows a photo indicator: 🖼️ = has photo, ⬜ = no photo
+
+4. PRODUCT PHOTOS — SHOWN WHEN THE PRODUCT IS SELECTED FROM THE STORE
+------------------------------------------------------------------------------
+Storage (no database migration required):
+    - the photo lives in the existing settings KV table under the key
+      `product_photo:{product_id}` and holds a Telegram file_id
+    - a Telegram file_id is permanent for the bot, so the binary stays on
+      Telegram servers and never has to be re-uploaded or hosted by us
+New helpers in lib/storeFlow.ts:
+    - getProductPhoto(id)            one product photo
+    - setProductPhoto(id, file_id)   save, or pass '' to remove
+    - getProductPhotoMap()           every photo in ONE query (store list)
+    - getProductAny(id)              includes hidden products
+    - updateProduct(id, fields)      whitelisted partial update
+New sender in lib/bot.ts:
+    - sendPhoto(chatId, file_id, caption, {buttons})
+      keyboard support + 1024-character caption trim + author credit line
+Where the photo is now visible:
+    - /product ID            -> the card is delivered as a real Telegram photo
+    - tapping a product in /store or /search (callback product:{id})
+                             -> sendProductCard() sends the photo
+    - /store                 -> 🖼️ marker next to products that have a photo
+    - /products (admin)      -> 🖼️ = has photo, ⬜ = no photo
+Safe fallback:
+    - Telegram allows only 1024 characters in a photo caption, so when the card
+      text is longer than ~900 characters (or the photo send fails) the bot
+      automatically falls back to a normal text message. A long description can
+      never make the product view fail.
+Set or change a photo:
+    /editproduct ID photo      (then send the image)
+    /editproduct ID clearphoto (remove it)
+    or use the Photo / Remove photo buttons in the /editproduct menu
+
+5. EXTRA FIXES MADE IN THIS ROUND
+------------------------------------------------------------------------------
+- sendPhoto applies the author credit exactly once (marker-guarded) and trims
+  captions to Telegram's 1024-character limit.
+- The /product photo path mirrors sendProductCard's length guard, so a product
+  with a long description cannot fail with a caption-too-long error.
+- /api/bot-setup and the in-bot /syncmenu share one BOT_COMMANDS list, so the
+  Telegram "/" menu can never drift out of sync with the code again
+  (11 public commands, admin commands scoped to the admin's own chat).
+
+6. HOW TO APPLY AND VERIFY
+------------------------------------------------------------------------------
+- Host: https://poppygram.vercel.app   (Vercel project: poppygram)
+- Typecheck: PASS (tsc --noEmit exit 0) and the Vercel build must be Ready.
+- Refresh the Telegram menu: send /syncmenu to the bot as the owner. It updates
+  the public menu for everyone and registers the admin commands only in your
+  own chat, so users never see store-management commands.
+- Refresh webhook + menu from CI/terminal:
+      POST /api/bot-setup
+      Authorization: Bearer <CRON_SECRET>
+  (add ?drop=true only when you want to clear the pending update queue)
+- Suggested test path:
+      /credits  -> check the GitHub credit button
+      /support  -> check the support card and the t.me button
+      /addfile  -> upload a file ("Name | Price | Description")
+      /editproduct ID -> Photo -> send an image
+      /store -> tap the product -> the photo must appear above the card
+
+
+7. VERIFIED PRODUCTION STATE (final check of this build)
+ ------------------------------------------------------------------------------
+ Deployment : https://poppygram-oozheka6i-aj-98ff.vercel.app
+ Alias      : https://poppygram.vercel.app     (Vercel project: poppygram)
+ Status     : Ready | Typecheck: PASS (tsc --noEmit exit 0)
+ Runtime smoke tests run against the live alias:
+   GET  /api/bot-verify?t=<invalid>   -> 404 {"error":"Invalid or expired link"}
+   POST /api/bot-verify  (junk body)  -> 409 {"error":"Invalid or expired link"}
+   POST /api/bot         (no secret)  -> 403 {"error":"Forbidden"}
+   GET  /botlogin?t=<invalid>         -> 200 (public login page renders)
+   GET  /                             -> 200 (login screen)
+   GET  /api/accounts    (no cookie)  -> 401 (admin gate intact)
+   GET  /api/_diag  /api/_cmds        -> 401 (temporary probes removed)
+ The bot-verify results prove the live functions can read the database and
+ the encryption key; the 403 proves the webhook route is publicly reachable
+ while still rejecting anything without the Telegram secret header.
+
+ What to test in Telegram (owner account):
+   /syncmenu                     -> public + admin command menu registered
+   /credits                      -> GitHub button -> github.com/AngelJangra
+   /support                      -> support card + t.me/poppygramsupportbot
+   /addfile                      -> "Name | Price | Description"
+   /editproduct ID               -> menu: Name / Price / Description /
+                                    Photo / File / File+Caption /
+                                    Show-Hide / Close
+   /editproduct ID photo         -> send an image, then /product ID
+   /store                        -> tap the product: the photo appears with
+                                    the card; /products shows the photo marker
+   /delproduct ID                -> /restoreproduct ID brings it back
+   /addcredit 123456789 1000     -> numeric ID works even without a username
+
+ RULE: after editing any file, redeploy with `vercel deploy --prod --yes`
+ and run `node node_modules/typescript/bin/tsc --noEmit` first - the Vercel
+ build is stricter than a local one and will fail the deploy on type errors.
+
