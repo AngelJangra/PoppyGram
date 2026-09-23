@@ -551,7 +551,7 @@ function App(){
     if(!logged||expiresAt===null)return;
     const tick=()=>{
       const r=Math.max(0,Math.ceil((expiresAt-Date.now())/1000));
-      if(r<=0){setRemain(0);api('/api/auth/logout').catch(()=>{});setLogged(false);return}
+      if(r<=0){setRemain(0);api('/api/auth/logout',{method:'POST'}).catch(()=>{});setExpiresAt(null);setLogged(false);return}
       setRemain(r);
     };
     tick();
@@ -600,7 +600,11 @@ function App(){
     }catch(e:any){setMsg(e?.message||'Scheduler failed')}
     finally{schedulerBusyRef.current=false}
   };
-  const logout=async()=>{await api('/api/auth/logout');setLogged(false)};
+  // Must POST: /api/auth/logout rejects GET with 405, which used to throw
+  // before setLogged ran — the Sign out button then did nothing visible.
+  // Local state clears even if the network call fails; expiresAt stops the
+  // countdown so no stale timer can fire after logout.
+  const logout=async()=>{try{await api('/api/auth/logout',{method:'POST'})}catch{};setExpiresAt(null);setLogged(false)};
   const tabs:any=[['dashboard','Dashboard',Activity],['accounts','Accounts',Users],['add','Add account',Users],['send','Send message',Send],['health','System health',HeartPulse],['scheduler','Scheduler',Clock3],['backups','Backup & restore',Database],['settings','Settings',Settings]];
   return <div className={dark?'app dark':'app'}>
     <aside><div className="brand"><img src="/poppygram.png" alt="PoppyGram logo"/><b>PoppyGram</b></div>
