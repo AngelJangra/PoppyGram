@@ -415,7 +415,7 @@ async function handleMessage(msg:any):Promise<{text:string;buttons?:any[][];phot
   if(cmd.startsWith('/') && cmd!=='/cancel' && cmd!=='/addfile'){
     await clearAllFlows(chatId,u.id);
   }
-  if(cmd==='/start')return {text:GREETING,buttons:[[ {text:'🛍️ Store',callback_data:'store'}, {text:'💳 Balance',callback_data:'balance'} ],[ {text:'📖 Help',callback_data:'help'}, {text:'🔐 Verify',callback_data:'auth'} ],[ {text:'🆘 Support',url:SUPPORT_URL}, {text:'💎 Credits',callback_data:'credits'} ]]};
+  if(cmd==='/start')return {text:GREETING,buttons:[[ {text:'🛍️ Store',callback_data:'store'}, {text:'💳 Balance',callback_data:'balance'} ],[ {text:'📖 Help',callback_data:'help'}, {text:'🔐 Verify',callback_data:'auth'} ],[ {text:'🆘 Support',url:SUPPORT_URL}, {text:'💎 Credits',callback_data:'credits'} ],[ {text:'🌐 Web App',web_app:{url:'https://poppygram.vercel.app/app'}}]]};
   if(cmd==='/help')return {text:HELP,buttons:[[ {text:'🛍️ Open Store',callback_data:'store'} ],[ {text:'💳 My Balance',callback_data:'balance'} ],[ {text:'🆘 Support',callback_data:'support'}, {text:'💎 Credits',callback_data:'credits'} ]]};
   if(cmd==='/support'||cmd==='/contact'){
     return {text:supportMessage(u.id),buttons:[[ {text:`🆘 Chat with @${SUPPORT_BOT}`,url:SUPPORT_URL} ],[ {text:'🛍️ Open Store',callback_data:'store'}, {text:'💎 Credits',callback_data:'credits'} ]]};

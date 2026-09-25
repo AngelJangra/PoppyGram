@@ -46,10 +46,10 @@ export function F(s:string):string{
 export function escapeHtml(s:string):string{
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-export interface BotButton{text:string;url?:string;callback_data?:string}
+export interface BotButton{text:string;url?:string;callback_data?:string;web_app?:{url:string}}
 function keyboard(buttons?:BotButton[][]){
   if(!buttons?.length)return undefined;
-  return {inline_keyboard:buttons.map(row=>row.map(b=>({text:b.text,...(b.url?{url:b.url}:{}),...(b.callback_data?{callback_data:b.callback_data}:{})})))};
+  return {inline_keyboard:buttons.map(row=>row.map(b=>({text:b.text,...(b.url?{url:b.url}:{}),...(b.callback_data?{callback_data:b.callback_data}:{}),...(b.web_app?{web_app:b.web_app}:{})})))};
 }
 // Every bot reply carries the author credit. Pass credit:false for internal
 // transport messages that must stay clean.

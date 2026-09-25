@@ -375,7 +375,63 @@
   color: var(--wa-accent2); text-decoration: none; font-size: 0.9rem; padding: 0.3rem 0;
   border-bottom: 1px solid var(--wa-border);
 }
-.wa-link:hover { color: var(--wa-accent); text-decoration: underline; }
+.wa-link:hover { color: var(--wa-accent2); text-decoration: underline; }
+
+/* Login Section + User Bar */
+.wa-login-section { padding: 2rem; min-height: 100vh; }
+.wa-login-card { max-width: 400px; margin: 0 auto; text-align: center; }
+.wa-login-card h2 { color: var(--wa-accent); font-size: 1.8rem; margin: 0 0 0.8rem; }
+.wa-login-card p { color: var(--wa-muted); font-size: 0.9rem; }
+.wa-login-note { color: var(--wa-muted); font-size: 0.8rem; margin-top: 0.8rem; }
+.wa-tg-login-container { display: flex; justify-content: center; margin: 1rem 0; }
+.wa-user-bar {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: var(--wa-card); border: 1px solid var(--wa-border);
+  border-radius: 10px; padding: 0.4rem 0.8rem; margin-top: 0.6rem;
+}
+.wa-user-balance { color: var(--wa-accent); font-weight: 600; }
+
+/* Message Thread */
+.wa-messages { display: flex; flex-direction: column; height: 400px; }
+.wa-msg-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 0; border-bottom: 1px solid var(--wa-border);
+}
+.wa-msg-header h3 { font-size: 0.95rem; margin: 0; }
+.wa-nav-back {
+  color: var(--wa-accent); cursor: pointer;
+  font-size: 0.8rem; padding: 0.2rem 0.5rem;
+}
+.wa-msg-list {
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;
+  padding: 0.6rem 0;
+}
+.wa-msg { display: flex; }
+.wa-msg-user { justify-content: flex-end; }
+.wa-msg-admin { justify-content: flex-start; }
+.wa-msg-bubble {
+  max-width: 70%; padding: 0.5rem 0.8rem; border-radius: 12px;
+  font-size: 0.85rem; line-height: 1.4;
+}
+.wa-msg-user .wa-msg-bubble {
+  background: var(--wa-accent); color: #000; border-radius: 12px 4px 12px 12px;
+}
+.wa-msg-admin .wa-msg-bubble {
+  background: var(--wa-card); border: 1px solid var(--wa-border);
+  border-radius: 4px 12px 12px 12px;
+}
+.wa-msg-sender {
+  display: block; font-size: 0.7rem; font-weight: 600; margin-bottom: 0.2rem;
+  color: var(--wa-muted);
+}
+.wa-msg-text { white-space: pre-wrap; word-break: break-word; }
+.wa-msg-time {
+  display: block; font-size: 0.65rem; margin-top: 0.3rem; opacity: 0.6;
+}
+.wa-msg-polling {
+  text-align: center; color: var(--wa-muted); font-size: 0.8rem; padding: 0.4rem;
+}
+
 
 .wa-id-required { text-align: center; padding: 2rem; color: var(--wa-muted); }
 .wa-muted { color: var(--wa-muted); }
