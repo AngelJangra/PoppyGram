@@ -1,0 +1,296 @@
+﻿============================================================
+DEPLOYMENT GUIDE: PoppyGram Support Webapp to Bot Integration
+============================================================
+
+INSTRUCTIONS FOR THE AI AGENT:
+- Show ONLY the current step (step X of Y).
+- Wait for the user to respond "done" before proceeding to the next step.
+- If the user encounters an error, provide troubleshooting help.
+- If a code-side problem occurs, output a CODE FIX PROMPT section.
+- Be concise, clear, and actionable.
+
+------------------------------------------------------------
+
+STEP 1 of 8: ENVIRONMENT & PREREQUISITES CHECK
+
+Verify that all required tools and files are present locally:
+
+1. Confirm these files exist:
+   - pages/support.tsx
+   - pages/api/support.ts
+   - styles/support.css
+
+2. Confirm existing files are present:
+   - lib/db.ts        (exports db Supabase client)
+   - lib/bot.ts       (exports sendMessage)
+   - lib/adminAuth.ts (exports requireAdmin)
+   - lib/credits.ts   (exports PROJECT_NAME, GITHUB_USERNAME)
+   - pages/_app.tsx   (global styles)
+   - tsconfig.json
+   - package.json
+
+3. Confirm Node.js: run node -v (expected: v18+)
+4. Confirm npm: run npm -v (expected: 8+)
+5. Confirm TypeScript compiles: npx tsc --noEmit (expected: no errors)
+
+If all check out, reply "done" to proceed to Step 2.
+
+---
+CODE FIX PROMPT:
+> PoppyGram Support webapp deployment fails at Step 1.
+> Error: [REPLACE WITH ACTUAL ERROR]
+> Files: pages/support.tsx, pages/api/support.ts, styles/support.css
+> Verify lib/db.ts, lib/bot.ts, lib/adminAuth.ts imports and tsconfig.
+> Please diagnose.
+---
+
+------------------------------------------------------------
+
+STEP 2 of 8: VERIFY SUPABASE DATABASE TABLES
+
+Run this SQL in your Supabase SQL editor:
+
+  SELECT table_name FROM information_schema.tables
+  WHERE table_schema = 'public'
+  AND table_name IN (
+    'support_tickets','support_messages','file_requests',
+    'feedback','bot_admins','bot_users','settings','audit_logs'
+  );
+
+Expected: All 8 tables returned.
+
+Also run:
+  INSERT INTO settings (key, value) VALUES
+    ('support_hours','24/7'),
+    ('support_welcome','Thank you for reaching out! Reply shortly.'),
+    ('support_offline_msg','Support is offline. Leave a message.'),
+    ('support_claim_timeout','300')
+  ON CONFLICT (key) DO NOTHING;
+
+Check active admins:
+  SELECT username, active FROM bot_admins WHERE active = true;
+
+If empty, add yourself:
+  INSERT INTO bot_admins (username, active, added_by)
+  VALUES ('[YOUR_TELEGRAM_USERNAME]', true, 'owner')
+  ON CONFLICT (username) DO UPDATE SET active = true;
+
+Reply "done" to proceed to Step 3.
+
+---
+CODE FIX PROMPT:
+> Supabase tables missing or schema issues for PoppyGram Support.
+> Required: support_tickets, support_messages, file_requests,
+> feedback, bot_admins, bot_users, settings, audit_logs.
+> Error: [REPLACE WITH ACTUAL ERROR]
+> Provide SQL migration scripts. Reference supabase/schema.sql.
+---
+
+------------------------------------------------------------
+
+STEP 3 of 8: CONFIGURE ENVIRONMENT VARIABLES
+
+Open .env.local and ensure these are set:
+
+  NEXT_PUBLIC_SUPABASE_URL=https://[ref].supabase.co
+  SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=[anon-key]
+  ENCRYPTION_KEY_BASE64_32_BYTES=[32-byte-key]
+  ADMIN_PASSWORD_HASH=[bcrypt-hash]
+  TG_OWNER_CHAT_ID=[chat-id]   (optional)
+
+Start the dev server: npm run dev
+Open http://localhost:3000 and verify no startup DB errors.
+
+Reply "done" to proceed to Step 4.
+
+---
+CODE FIX PROMPT:
+> Env var config for PoppyGram Support webapp failing.
+> Error: [REPLACE WITH ACTUAL ERROR]
+> Needs: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+> ENCRYPTION_KEY_BASE64_32_BYTES, ADMIN_PASSWORD_HASH, TG_OWNER_CHAT_ID.
+> Check lib/db.ts, lib/adminAuth.ts, lib/bot.ts for required vars.
+---
+
+------------------------------------------------------------
+
+STEP 4 of 8: TEST ADMIN AUTHENTICATION
+
+1. Run: npm run dev
+2. Open http://localhost:3000/admin and log in.
+3. Open NEW tab -> http://localhost:3000/support
+   Expected: Support page loads (header + tabs visible).
+   Stats tab should show ticket/request/feedback counts.
+
+If you see "401 Unauthorized" on the Support page:
+- The admin_session cookie is not shared correctly.
+- Check pages/_app.tsx and pages/admin.tsx cookie logic.
+
+Reply "done" to proceed to Step 5.
+
+---
+CODE FIX PROMPT:
+> Admin auth for PoppyGram Support webapp failing.
+> Page/API returns 401. admin_session cookie not recognized.
+> Error: [REPLACE WITH ACTUAL ERROR]
+> Files: pages/api/support.ts (requireAdmin), lib/adminAuth.ts,
+> pages/_app.tsx, pages/admin.tsx. Diagnose cookie/auth issue.
+---
+
+------------------------------------------------------------
+
+STEP 5 of 8: VERIFY API ENDPOINTS
+
+Test GET endpoints (include admin_session cookie where noted):
+
+  a) FAQ (public):     curl http://localhost:3000/api/support?faq=1
+  b) Stats:            curl http://localhost:3000/api/support?tab=stats
+  c) Staff:            curl -H 'Cookie: admin_session=[COOKIE]' http://localhost:3000/api/support?tab=staff
+  d) Settings:         curl -H 'Cookie: admin_session=[COOKIE]' http://localhost:3000/api/support?tab=settings
+  e) Tickets:          curl -H 'Cookie: admin_session=[COOKIE]' http://localhost:3000/api/support?tab=tickets
+  f) Requests:         curl -H 'Cookie: admin_session=[COOKIE]' http://localhost:3000/api/support?tab=requests
+
+Get cookie from DevTools -> Application -> Cookies after login at /admin.
+
+All should return valid JSON.
+
+Reply "done" to proceed to Step 6.
+
+---
+CODE FIX PROMPT:
+> API endpoint testing for PoppyGram Support webapp failing.
+> Endpoints: GET /api/support?faq=1, tab=stats|staff|settings|tickets|requests
+> Error: [REPLACE WITH ACTUAL ERROR]
+> Files: pages/api/support.ts (handleGet, getStats, getFaq, Supabase queries).
+> Please diagnose SQL/DB access issue.
+---
+
+------------------------------------------------------------
+
+STEP 6 of 8: TEST POST ACTIONS
+
+1. Create test data in Supabase:
+   INSERT INTO support_tickets (kind, subject, status, priority, tg_user_id, created_at, updated_at)
+   VALUES ('general', 'Test ticket from webapp deploy', 'open', 'soon', '123456789', NOW(), NOW())
+   RETURNING id;  -- note the id (e.g. 1)
+
+   INSERT INTO file_requests (tg_user_id, file_name, priority, status, created_at)
+   VALUES ('123456789', 'test_doc.pdf', 'normal', 'pending', NOW())
+   RETURNING id;  -- note the id (e.g. 1)
+
+2. Test POST actions via curl (with admin cookie):
+   a) Claim:        POST /api/support {action:"claim",ticket_id:1}
+   b) Reply:        POST /api/support {action:"reply",ticket_id:1,text:"Test reply"}
+   c) Close:        POST /api/support {action:"close",ticket_id:1}
+   d) Approve:      POST /api/support {action:"approve",request_id:1}
+   e) Reject:       POST /api/support {action:"reject",request_id:1,reason:"Test"}
+   f) Set setting:  POST /api/support {action:"setsetting",key:"support_welcome",value:"Hello!"}
+
+   All POST requests: set header Content-Type: application/json
+   and include Cookie: admin_session=[YOUR_COOKIE]
+   All should return {"ok":true}
+
+3. Refresh http://localhost:3000/support and verify UI reflects changes.
+
+Reply "done" to proceed to Step 7.
+
+---
+CODE FIX PROMPT:
+> POST action testing for PoppyGram Support webapp failing.
+> Actions: claim, reply, close, approve, reject, setsetting
+> Error: [REPLACE WITH ACTUAL ERROR]
+> Files: pages/api/support.ts (handlePost, doClaim, doReply, doClose,
+> doApprove, doReject, doSetSetting, notifyUser, escapeHtml, UserLabel).
+> Please diagnose action handler or DB update issue.
+---
+
+------------------------------------------------------------
+
+STEP 7 of 8: VERIFY WEBAPP UI & BOT INTEGRATION
+
+1. At http://localhost:3000/support:
+   - Navigate all 6 tabs: Stats, Tickets, Requests, Feedback, Staff, Settings.
+   - Confirm data displays in tables/cards.
+   - Confirm tab switching works.
+
+2. Test Staff tab:
+   - Your admin should appear active.
+   - Click Deactivate -> should show inactive + button changes to Activate.
+   - Click Activate to restore.
+   - Add a test admin via input (testuser123) -> should appear in list.
+
+3. Test Telegram notifications:
+   - Send /support to the Telegram bot (or create a ticket).
+   - From the webapp, reply to the ticket (POST "reply" with text).
+   - The ticket creator should receive on Telegram:
+     "Shield STAFF REPLY - [reply text]"
+   - If no message arrives, check:
+     a) Bot can send messages (sendMessage in lib/bot.ts).
+     b) tg_user_id in support_tickets matches real Telegram ID.
+     c) Bot is running and user has not blocked it.
+
+4. Public FAQ: curl http://localhost:3000/api/support?faq=1
+   Should return FAQ content without auth.
+
+Reply "done" to proceed to Step 8.
+
+---
+CODE FIX PROMPT:
+> Webapp UI or Telegram bot integration for PoppyGram Support failing.
+> UI not displaying data, or Telegram notifications not sent on
+> staff actions (reply/claim/close/approve/reject).
+> Error: [REPLACE WITH ACTUAL ERROR]
+> Files: pages/support.tsx, pages/api/support.ts, lib/bot.ts,
+> Telegram Bot API. Please diagnose UI or bot notification issue.
+---
+
+------------------------------------------------------------
+
+STEP 8 of 8: PRODUCTION DEPLOYMENT CHECKLIST
+
+1. Set all env vars in your hosting platform (Vercel/Railway/etc.):
+   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+   ENCRYPTION_KEY_BASE64_32_BYTES, ADMIN_PASSWORD_HASH, TG_OWNER_CHAT_ID
+
+2. Verify Supabase service_role key has full DB access (not anon key).
+   RLS should be bypassed for service role by default.
+
+3. Verify FAQ in settings table:
+   SELECT value FROM settings WHERE key = support_faq;
+   (NULL/empty -> default FAQ from getFaq() is used)
+
+4. If using Vercel:
+   - /support page is server-rendered (Next.js pages router).
+   - Set env vars in Vercel project settings -> Environment Variables.
+   - Build should include pages/support.tsx and pages/api/support.ts.
+
+5. Post-deploy test:
+   - Visit https://[domain]/support -> log in via /admin first.
+   - Verify all tabs and POST actions work.
+   - curl https://[domain]/api/support?faq=1 (no auth needed).
+
+6. Clean up test data:
+   DELETE FROM support_tickets WHERE subject LIKE %Test%;
+   DELETE FROM file_requests WHERE file_name LIKE %test%;
+   DELETE FROM bot_admins WHERE username = 'testuser123';
+
+7. Monitor:
+   - Supabase logs for API errors.
+   - Telegram bot for notification failures.
+   - Errors logged via console.error([support api], e) in API.
+
+Deployment complete if all checks pass!
+
+---
+CODE FIX PROMPT:
+> Production deployment of PoppyGram Support webapp failing.
+> Error: [REPLACE WITH ACTUAL ERROR]
+> Please diagnose deployment/env/production config issues.
+> Files: pages/api/support.ts, pages/support.tsx, styles/support.css,
+> next.config.js, environment configuration.
+---
+
+============================================================
+END OF DEPLOYMENT GUIDE (8 Steps)
+============================================================
