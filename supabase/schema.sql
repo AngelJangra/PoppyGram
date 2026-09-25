@@ -248,3 +248,103 @@ alter table accounts add column if not exists auth_owner_tg_id text;
 create index if not exists accounts_auth_owner_tg_id_idx on accounts(auth_owner_tg_id);
 -- Telegram bot ownership is the bot chat/user ID, not the authenticated MTProto account ID.
 -- New logins store bot_tg_id in accounts.meta and auth_owner_tg_id as the bot user ID.
+
+
+-- ============================================================================
+-- PoppyGram Support: support tickets, messages, file requests & feedback
+-- Back the /support webapp (pages/support.tsx) and pages/api/support.ts.
+-- Idempotent (create table if not exists / on conflict do nothing) — safe to re-run.
+-- Conventions match the rest of this schema: bigint identity PK, timestamptz
+-- timestamps, RLS enabled. The web app uses the server-only service-role key
+-- which bypasses RLS; anon/authenticated clients are denied by default.
+-- ============================================================================
+
+-- Support tickets opened by users (Telegram bot live support) or raised from
+-- the admin console. status transitions: open -> claimed -> closed.
+create table if not exists support_tickets(
+  id bigint generated always as identity primary key,
+  kind text not null default 'general' check (kind in ('live','general')),
+  subject text not null default '',
+  status text not null default 'open' check (status in ('open','claimed','closed')),
+  assigned_to text,
+  tg_user_id text,
+  username text default '',
+  priority text not null default 'normal' check (priority in ('urgent','soon','normal')),
+  closed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists support_tickets_status_idx on support_tickets(status);
+create index if not exists support_tickets_created_idx on support_tickets(created_at desc);
+create index if not exists support_tickets_tg_user_idx on support_tickets(tg_user_id);
+create index if not exists support_tickets_assigned_idx on support_tickets(assigned_to);
+
+-- Replies threaded under a ticket. sender_role is 'user' (Telegram) or 'admin'
+-- (console reply via pages/api/support.ts -> doReply).
+create table if not exists support_messages(
+  id bigint generated always as identity primary key,
+  ticket_id bigint not null references support_tickets(id) on delete cascade,
+  sender_role text not null default 'user' check (sender_role in ('user','admin')),
+  text text not null default '',
+  file_id text,
+  created_at timestamptz not null default now()
+);
+create index if not exists support_messages_ticket_idx on support_messages(ticket_id);
+create index if not exists support_messages_created_idx on support_messages(created_at asc);
+
+-- File requests raised by users ("Request a File" in the support bot).
+-- status transitions: pending -> approved|rejected.
+create table if not exists file_requests(
+  id bigint generated always as identity primary key,
+  tg_user_id text,
+  username text default '',
+  file_name text not null,
+  description text default '',
+  source_link text default '',
+  priority text not null default 'normal' check (priority in ('urgent','soon','normal')),
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  note text default '',
+  handled_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists file_requests_status_idx on file_requests(status);
+create index if not exists file_requests_created_idx on file_requests(created_at desc);
+create index if not exists file_requests_tg_user_idx on file_requests(tg_user_id);
+
+-- Star ratings + text feedback submitted via the bot "Rate us" / support bot.
+create table if not exists feedback(
+  id bigint generated always as identity primary key,
+  tg_user_id text,
+  username text default '',
+  rating smallint not null check (rating between 1 and 5),
+  text text default '',
+  category text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists feedback_created_idx on feedback(created_at desc);
+create index if not exists feedback_tg_user_idx on feedback(tg_user_id);
+
+-- Lock down the new tables exactly like the existing app tables (service role
+-- bypasses RLS, so pages/api/* still works).
+alter table support_tickets enable row level security;
+alter table support_messages enable row level security;
+alter table file_requests enable row level security;
+alter table feedback enable row level security;
+
+-- Keep support_tickets.updated_at fresh on claim/close/reply (mirrors the
+-- accounts / bot_users updated_at trigger pattern above).
+create or replace function set_support_tickets_updated_at() returns trigger language plpgsql as $$
+begin new.updated_at=now(); return new; end; $$;
+drop trigger if exists support_tickets_updated_at on support_tickets;
+create trigger support_tickets_updated_at before update on support_tickets for each row execute function set_support_tickets_updated_at();
+
+-- Seed default support settings read by getFaq() / the Settings tab. Safe to re-run.
+insert into settings(key,value) values
+  ('support_hours','09:00-22:00 IST'),
+  ('support_welcome','Thank you for reaching out! A support manager will reply shortly.'),
+  ('support_offline_msg','🕐 We are offline right now. Leave your message — a support manager will reply as soon as we are back. Your ticket stays open.'),
+  ('support_auto_reply','{"enabled":true}'),
+  ('support_claim_timeout','300'),
+  ('support_faq','{"Payment or credit problems":"Use /balance to check your credits, then /store to browse files. Credits are deducted at purchase.","Files that will not open or download":"Purchased files are delivered by the bot directly. If download fails, tell support your Telegram ID and the product name.","How do I contact support?":"Open @poppygramsupportbot in Telegram or use the Support webapp."}')
+on conflict(key) do nothing;
