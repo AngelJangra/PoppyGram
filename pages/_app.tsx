@@ -1,4 +1,5 @@
 import '../styles/globals.css';
+import '../styles/support.css';
 import type {AppProps} from 'next/app';
 import {useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/router';

@@ -1,6 +1,7 @@
 // PoppyGram Support Webapp Shell
 import { useEffect, useState } from "react";
-import "../styles/support.css";
+// Global CSS is imported in pages/_app.tsx (Next.js requires all global
+// stylesheet imports to live there — importing here breaks `next build`).
 
 type Ticket = {
   id: number;
