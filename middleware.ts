@@ -45,9 +45,10 @@ export async function middleware(req:NextRequest){
     // Allow unauthenticated entry points: auth, bot webhook (+verify), bot-login
     // start, and the public /botlogin page (Telegram users opening a login
     // link are NOT site admins and have no admin_session cookie).
-  // /api/bot = store bot webhook (secret header), /api/support = support bot
+    // /api/bot = store bot webhook (secret header), /api/support = support bot
   // webhook (its own hardcoded secret header, checked inside the Python handler).
-  if(path === '/api/auth/login'||path === '/api/auth/logout'||path === '/api/auth/check'||path === '/api/bot'||path === '/api/support'||path === '/api/bot-verify'||path.startsWith('/api/tg/bot-login')||path==='/botlogin'||path.startsWith('/botlogin?')||path.startsWith('/botlogin/'))return NextResponse.next();
+  // /api/web/* = public user-facing API endpoints (store, support, profile).
+  if(path === '/api/auth/login'||path === '/api/auth/logout'||path === '/api/auth/check'||path === '/api/bot'||path === '/api/support'||path === '/api/bot-verify'||path.startsWith('/api/tg/bot-login')||path.startsWith('/api/web/')||path==='/botlogin'||path.startsWith('/botlogin?')||path.startsWith('/botlogin/'))return NextResponse.next();
   // Machine endpoints that accept the CRON_SECRET bearer token. Vercel cron and the
   // documented /api/bot-setup call carry no admin cookie, so the shared secret
   // authorises them here; without it they fall through to the admin-session check.
