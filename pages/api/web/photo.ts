@@ -18,8 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `https://api.telegram.org/file/bot${token}/${filePath}`,
     );
     if (!response.ok) return res.status(404).json({ error: "File not found" });
-    const contentType =
-      response.headers.get("content-type") || "application/octet-stream";
+        const contentType =
+      response.headers.get("content-type") || "image/jpeg";
     const buffer = await response.arrayBuffer();
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, s-maxw=86400");
