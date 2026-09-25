@@ -7,3 +7,15 @@ PoppyGram-v2.zip
 PoppyGram-v3.zip
 CHATGPT
 *.log
+
+# Python Telegram bot files (api/support.py etc.) run their own webhook and
+# conflict with the Next.js /api/support API route on Vercel. Excluding them
+# from the Vercel build lets pages/api/support.ts own /api/support.
+# Deploy api/support.py separately (e.g., Railway / Render / standalone Vercel
+# Python project) and point the Telegram webhook there.
+api/*.py
+api/*.pyc
+api/__pycache__/
+bots/*.py
+bots/*.pyc
+bots/__pycache__/
