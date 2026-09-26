@@ -1,14 +1,17 @@
 // ---------------------------------------------------------------------------
 // PoppyGram User Webapp — /app
-// Browser-based interface for the store bot + support bot with Telegram login.
-// Users click "Login with Telegram" → widget verifies them → session cookie
-// stored → all bot features available (browse, buy, support chat).
+// Browser-based interface for the store bot + support bot.
+// Login is bot-driven (no Telegram Login Widget / shared domain needed):
+// users send /weblogin in the bot, then enter the Telegram ID + one-time
+// secret code here → /api/web/login verifies it → session cookie stored →
+// all bot features available (browse, buy, support chat).
 // ---------------------------------------------------------------------------
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import {
   ShoppingCart, History, HelpCircle, Send, FileText,
-  User, RefreshCw, Download, Search, X, LogOut,
+  User, RefreshCw, Download, Search, X, LogOut, LogIn, ShieldCheck,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -43,48 +46,65 @@ const api = async (path: string, options?: RequestInit) => {
   return d;
 };
 
-// ── Telegram Login Widget ────────────────────────────────────────────────────
-function TelegramLogin({ onLogin }: { onLogin: () => void }) {
-  const [loading, setLoading] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
+// ── Bot-driven Telegram Login ────────────────────────────────────────────────
+// No Telegram Login Widget: the user runs /weblogin in the bot, which replies
+// with their numeric Telegram ID + a one-time secret code (valid 15 minutes).
+// Submitting both here creates the session cookie (see /api/web/login).
+function BotLogin({ botUsername, onLogin }: { botUsername: string; onLogin: () => void }) {
+  const [tgId, setTgId] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const bot = botUsername || "poppygram";
 
-  useEffect(() => {
-    (window as any).onTelegramAuth = (user: any) => {
-      fetch("/api/web/login", {
+  const submit = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    const uid = tgId.trim();
+    const secret = code.trim();
+    if (!/^\d{5,16}$/.test(uid)) { setError("Enter the numeric Telegram ID shown by /weblogin."); return; }
+    if (!secret) { setError("Enter the secret code shown by /weblogin."); return; }
+    setBusy(true); setError("");
+    try {
+      await api("/api/web/login", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(user),
-      }).then(async (r) => {
-        const d = await r.json();
-        if (d.ok) onLogin();
-        else alert("Login failed: " + (d.error || "unknown error"));
-      }).catch(() => alert("Login request failed"));
-    };
-    fetch("/api/web/session").then((r) => r.json()).then((d) => {
-      setBotUsername(d.bot_username || "");
-      setLoading(false);
-      if (d.bot_username && containerRef.current) {
-        const script = document.createElement("script");
-        script.src = "https://telegram.org/js/telegram-widget.js?app=PoppyGram";
-        script.async = true;
-        script.setAttribute("data-telegram-login", d.bot_username);
-        script.setAttribute("data-size", "large");
-        script.setAttribute("data-onauth", "onTelegramAuth");
-        script.setAttribute("data-request-access", "write");
-        containerRef.current.innerHTML = "";
-        containerRef.current.appendChild(script);
-      }
-    });
-  }, [onLogin]);
-  const [botUsername, setBotUsername] = useState("");
+        body: JSON.stringify({ tg_user_id: uid, password: secret }),
+      });
+      onLogin();
+    } catch (err: any) {
+      setError(err.message || "Login failed. Please try again.");
+    } finally { setBusy(false); }
+  };
 
-  if (loading) return <div className="wa-loading">Loading login…</div>;
-  return <div ref={containerRef} className="wa-tg-login-container" />;
+  return (
+    <form className="wa-login-form" onSubmit={submit}>
+      <ol className="wa-login-steps">
+        <li>Open <a href={`https://t.me/${bot}`} target="_blank" rel="noopener noreferrer">@{bot}</a> in Telegram.</li>
+        <li>Send <code>/weblogin</code>.</li>
+        <li>Copy the <b>Telegram ID</b> and <b>Secret Code</b> you receive.</li>
+      </ol>
+      <label className="wa-login-field">
+        <span>Telegram ID</span>
+        <input className="wa-login-input" type="text" inputMode="numeric" autoComplete="off"
+          placeholder="e.g. 123456789" value={tgId} disabled={busy}
+          onChange={(e) => setTgId(e.target.value.replace(/[^\d]/g, ""))} />
+      </label>
+      <label className="wa-login-field">
+        <span>Secret Code</span>
+        <input className="wa-login-input wa-login-code" type="text" autoComplete="one-time-code"
+          placeholder="8-character code" maxLength={16} value={code} disabled={busy}
+          onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, ""))} />
+      </label>
+      {error && <div className="wa-login-error"><X size={14} /> {error}</div>}
+      <button className="wa-btn wa-btn-primary wa-login-submit" type="submit" disabled={busy}>
+        {busy ? <RefreshCw size={16} /> : <LogIn size={16} />} {busy ? "Verifying…" : "Login"}
+      </button>
+      <p className="wa-login-note"><ShieldCheck size={13} /> The secret code is valid for 15 minutes and can be used only once.</p>
+    </form>
+  );
 }
 
 // ── Header ───────────────────────────────────────────────────────────────────
-function WebAppHeader({
-  user, onLogout,
-}: { user: Me | null; onLogout: () => void }) {
+function WebAppHeader({ user, botUsername, onLogout }: { user: Me | null; botUsername: string; onLogout: () => void }) {
   return (
     <header className="wa-header">
       <div className="wa-header-inner">
@@ -93,7 +113,7 @@ function WebAppHeader({
           <span className="wa-logo-text">PoppyGram</span>
         </div>
         <div className="wa-bot-links">
-          <a href="https://t.me/poppygram" target="_blank" rel="noopener noreferrer">🛍️ Store Bot</a>
+                    <a href={`https://t.me/${botUsername}`} target="_blank" rel="noopener noreferrer">🛍️ Store Bot</a>
           <span>|</span>
           <a href="https://t.me/poppygramsupportbot" target="_blank" rel="noopener noreferrer">🛡️ Support Bot</a>
         </div>
@@ -342,8 +362,8 @@ function SupportTab({
 
 // ── ProfileTab ───────────────────────────────────────────────────────────────
 function ProfileTab({
-  me, onClaim, onRefresh,
-}: { me: Me | null; onClaim: () => Promise<void>; onRefresh: () => void }) {
+  me, botUsername, onClaim, onRefresh,
+}: { me: Me | null; botUsername: string; onClaim: () => Promise<void>; onRefresh: () => void }) {
   const [claiming, setClaiming] = useState(false);
   const handleClaim = async () => {
     setClaiming(true);
@@ -405,7 +425,7 @@ function ProfileTab({
       <div className="wa-card">
         <h3>Quick Links</h3>
         <div className="wa-links">
-          <a href="https://t.me/poppygram" target="_blank" rel="noopener noreferrer" className="wa-link">
+                    <a href={`https://t.me/${botUsername}`} target="_blank" rel="noopener noreferrer" className="wa-link">
             💎 PoppyGram Store Bot
           </a>
           <a href="https://t.me/poppygramsupportbot" target="_blank" rel="noopener noreferrer" className="wa-link">
@@ -420,6 +440,7 @@ function ProfileTab({
 // ── Main App ────────────────────────────────────────────────────────────────
 export default function WebApp() {
   const [user, setUser] = useState<Me | null>(null);
+  const [botUsername, setBotUsername] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("store");
   const [products, setProducts] = useState<Product[]>([]);
@@ -436,7 +457,8 @@ export default function WebApp() {
           api("/api/web/products"),
           api("/api/web/faq"),
         ]);
-        if (session.user) setUser(session.user);
+                if (session.user) setUser(session.user);
+        setBotUsername(session.bot_username || "");
         setProducts(p.products || []);
         setFaq(f.faq || {});
       } catch (e: any) { setError(e.message || "Failed to load data"); }
@@ -520,15 +542,14 @@ export default function WebApp() {
 
   return (
     <div className="sp-page-wrapper wa-app">
-      <WebAppHeader user={user} onLogout={handleLogout} />
+            <WebAppHeader user={user} botUsername={botUsername} onLogout={handleLogout} />
 
       {!user && (
         <div className="wa-login-section">
           <div className="wa-card wa-login-card">
             <h2>💎 Welcome to PoppyGram</h2>
-            <p>Log in with your Telegram account to browse products, check balance, and contact support.</p>
-            <TelegramLogin onLogin={handleLogin} />
-            <p className="wa-login-note">You must have an active chat with @poppygram in Telegram.</p>
+            <p>Log in with your Telegram account to browse products, check your balance, and contact support.</p>
+            <BotLogin botUsername={botUsername} onLogin={handleLogin} />
           </div>
         </div>
       )}
@@ -561,7 +582,7 @@ export default function WebApp() {
                 onRefresh={() => { refresh(); loadUserData(); }} />
             )}
             {activeTab === "profile" && (
-              <ProfileTab me={user} onClaim={handleClaim}
+                            <ProfileTab me={user} botUsername={botUsername} onClaim={handleClaim}
                 onRefresh={() => { refresh(); loadUserData(); }} />
             )}
           </main>

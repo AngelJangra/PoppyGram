@@ -89,6 +89,7 @@ export const BOT_COMMANDS=[
   {command:'history',description:'View purchase history'},
   {command:'profile',description:'Your profile and account status'},
   {command:'auth',description:'Add your Telegram account'},
+  {command:'weblogin',description:'Get login code for web app'},
   {command:'freecredits',description:'Claim free store credits'},
   {command:'support',description:'Contact PoppyGram support'},
   {command:'credits',description:'Project credits and developer'},

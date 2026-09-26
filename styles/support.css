@@ -382,8 +382,43 @@
 .wa-login-card { max-width: 400px; margin: 0 auto; text-align: center; }
 .wa-login-card h2 { color: var(--wa-accent); font-size: 1.8rem; margin: 0 0 0.8rem; }
 .wa-login-card p { color: var(--wa-muted); font-size: 0.9rem; }
-.wa-login-note { color: var(--wa-muted); font-size: 0.8rem; margin-top: 0.8rem; }
-.wa-tg-login-container { display: flex; justify-content: center; margin: 1rem 0; }
+/* Bot-driven login form (/weblogin → Telegram ID + one-time secret code) */
+.wa-login-form { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 1rem; text-align: left; }
+.wa-login-steps { margin: 0 0 0.2rem; padding-left: 1.15rem; color: var(--wa-muted); font-size: 0.83rem; line-height: 1.7; }
+.wa-login-steps a { color: var(--wa-accent2); text-decoration: none; }
+.wa-login-steps a:hover { text-decoration: underline; }
+.wa-login-steps code {
+  background: var(--wa-bg); border: 1px solid var(--wa-border); border-radius: 6px;
+  padding: 0.05rem 0.35rem; color: var(--wa-accent2); font-size: 0.8rem;
+}
+.wa-login-field { display: block; }
+.wa-login-field > span {
+  display: block; margin-bottom: 0.3rem; font-size: 0.7rem; font-weight: 600;
+  letter-spacing: 0.5px; text-transform: uppercase; color: var(--wa-muted);
+}
+.wa-login-input {
+  width: 100%; padding: 0.7rem 0.85rem; border-radius: 10px;
+  border: 1px solid var(--wa-border); background: var(--wa-bg); color: var(--wa-text);
+  font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+}
+.wa-login-input::placeholder { color: var(--wa-muted); opacity: 0.6; }
+.wa-login-input:focus { border-color: var(--wa-accent); }
+.wa-login-input:disabled { opacity: 0.6; cursor: not-allowed; }
+.wa-login-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 3px; text-transform: uppercase;
+}
+.wa-login-error {
+  display: flex; align-items: center; gap: 0.35rem;
+  color: var(--wa-red); font-size: 0.82rem; line-height: 1.4;
+}
+.wa-login-submit { width: 100%; justify-content: center; margin-top: 0.2rem; }
+.wa-login-submit:disabled { opacity: 0.7; cursor: progress; }
+/* Scoped to .wa-login-card so it wins over the card's generic `p` rule. */
+.wa-login-card .wa-login-note {
+  display: flex; align-items: center; gap: 0.35rem;
+  color: var(--wa-muted); font-size: 0.78rem; margin: 0.2rem 0 0;
+}
 .wa-user-bar {
   display: flex; align-items: center; gap: 0.6rem;
   background: var(--wa-card); border: 1px solid var(--wa-border);

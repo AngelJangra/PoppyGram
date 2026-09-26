@@ -259,3 +259,45 @@ ${DIV}
   ]);
   return {ok:true};
 }
+
+// Removes a pending web-login ticket (fire-and-forget: never throws).
+async function deleteWebLoginPass(uid: string): Promise<void> {
+  try { await db.from('settings').delete().eq('key', `weblogin:${uid}`); } catch {}
+}
+
+export async function generateWebLoginPass(tgUserId: number | string): Promise<{ password: string; expiresAt: number }> {
+  const uid = String(tgUserId).trim();
+  const password = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8 characters hex code
+  const ttlMs = 15 * 60 * 1000; // 15 minutes
+  const expiresAt = Date.now() + ttlMs;
+  const payload = JSON.stringify({ tg_user_id: uid, password, expiresAt });
+  const { error } = await db.from('settings').upsert({
+    key: `weblogin:${uid}`,
+    value: encrypt(payload),
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'key' });
+  if (error) throw new Error(`Could not store the web login code: ${error.message}`);
+  return { password, expiresAt };
+}
+
+export async function verifyWebLoginPass(tgUserId: number | string, inputPass: string): Promise<boolean> {
+  const uid = String(tgUserId).trim();
+  const cleanPass = String(inputPass || '').trim().toUpperCase();
+  if (!uid || !cleanPass) return false;
+  const { data } = await db.from('settings').select('value').eq('key', `weblogin:${uid}`).maybeSingle();
+  if (!data?.value) return false;
+  try {
+    const parsed = JSON.parse(decrypt(data.value));
+    if (!parsed || String(parsed.tg_user_id) !== uid) return false;
+    if (Date.now() > Number(parsed.expiresAt)) {
+      await deleteWebLoginPass(uid);
+      return false;
+    }
+    if (String(parsed.password).toUpperCase() === cleanPass) {
+      // One-time use: delete code once successfully verified
+      await deleteWebLoginPass(uid);
+      return true;
+    }
+  } catch {}
+  return false;
+}

@@ -464,3 +464,53 @@ Set or change a photo:
  and run `node node_modules/typescript/bin/tsc --noEmit` first - the Vercel
  build is stricter than a local one and will fail the deploy on type errors.
 
+
+==============================================================================
+PART B - WEB APP LOGIN: TELEGRAM WIDGET REMOVED, /weblogin ADDED
+==============================================================================
+
+ WHY
+ Telegram's Login Widget requires a domain registered with /setdomain, fails
+ silently behind Vercel preview URLs, and any mismatch shows "Bot domain
+ invalid". The new flow needs no BotFather domain at all.
+
+ NEW FLOW
+   1. User opens https://poppygram.vercel.app/app
+   2. The login card shows the 3 steps: open @<store bot> -> send /weblogin
+      -> copy the Telegram ID + secret code.
+   3. /weblogin (private chats only) replies with:
+        Telegram ID:  <uid>
+        Secret Code:  <8 hex chars>
+      stored ENCRYPTED in the settings table under key `weblogin:<uid>` as
+      {tg_user_id, password, expiresAt}; valid 15 minutes, single use.
+   4. /api/web/login {tg_user_id, password} verifies the code, deletes the
+      ticket, and sets the signed wa_session cookie (unchanged format).
+   - Entering a new /weblogin code overwrites the previous one.
+   - The old widget payload {id, first_name, auth_date, hash} is still
+     accepted as a fallback, so nothing that already works breaks.
+
+ FILES
+   lib/botFlow.ts          generateWebLoginPass(), verifyWebLoginPass(),
+                           deleteWebLoginPass()  (AES-256-GCM at rest,
+                           one-time delete, 15-min TTL, expired rows cleaned)
+   lib/bot.ts              `weblogin` added to BOT_COMMANDS
+   pages/api/bot.ts        /weblogin handler + /weblogin added to /help
+   pages/api/web/login.ts  password-first verification, widget fallback kept
+   pages/api/web/session.ts comments only (bot username still returned)
+   pages/app.tsx           widget script removed; BotLogin form (ID + code,
+                           2-field validation, inline error, busy state)
+   styles/support.css      .wa-login-form / steps / field / input / code /
+                           error / submit / note (dead widget CSS removed)
+   WEBAPP_INTEGRATION_GUIDE.md  login section rewritten + login.ts table row
+
+ VERIFIED LOCALLY (mock PostgREST + real lib modules + live next dev)
+   API route (/api/web/login): 9/9 PASS - valid code -> 200 + signed
+   wa_session cookie (HttpOnly; SameSite=Lax), replay -> 401, wrong code
+   -> 401, malformed ID -> 400, missing credentials -> 400, GET -> 405.
+   Ticket lifecycle: 13/13 PASS - 8 hex chars, ~15-min TTL, encrypted row
+   `weblogin:<uid>`, wrong code/uid rejected, lowercase input accepted,
+   one-time use, row deleted after use, expired code rejected + cleaned,
+   re-issue invalidates the previous code.
+   `tsc --noEmit` exit 0 and `next build` completed without errors.
+
+

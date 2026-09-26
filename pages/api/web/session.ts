@@ -1,6 +1,6 @@
 // GET /api/web/session
 // Returns the current authenticated user (from wa_session cookie) and the
-// bot's username (needed by the client to initialize the Telegram login widget).
+// bot's username (needed by the client to link to the bot for /weblogin).
 // If no session, user is null but bot_username is still returned.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { verifyTgId } from "../../../lib/webappAuth";
@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method not allowed" });
   }
   try {
-    // Get bot username for the login widget
+    // Bot username for the login screen (t.me/<bot> link + /weblogin instructions)
     let botUsername = "";
     try {
       const me = await getMe();

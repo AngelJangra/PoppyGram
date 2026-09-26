@@ -2,8 +2,12 @@ import {db} from '../../lib/db';
 import type {NextApiRequest,NextApiResponse} from 'next';
 import {sendMessage,sendPhoto,getMe,F,escapeHtml,answerCallbackQuery,setMyCommands,BOT_COMMANDS,ADMIN_BOT_COMMANDS} from '../../lib/bot';
 import {PROJECT_NAME,GITHUB_USERNAME,GITHUB_URL,SUPPORT_BOT,SUPPORT_URL,creditsCard,creditButtons} from '../../lib/credits';
-import {startAuth,handlePhone,clearState,getStateSafe,deleteLoginTicketsForChat,getUploadPending,setUploadPending,clearUploadPending,getEditState,setEditState,clearEditState} from '../../lib/botFlow';
+import {startAuth,handlePhone,clearState,getStateSafe,deleteLoginTicketsForChat,getUploadPending,setUploadPending,clearUploadPending,getEditState,setEditState,clearEditState,generateWebLoginPass} from '../../lib/botFlow';
 import type {EditState} from '../../lib/botFlow';
+
+// Dynamic app URL — avoids "bot domain invalid" from Telegram when the
+// deployment alias or local domain doesn't match the hardcoded value.
+const APP_URL=process.env.NEXT_PUBLIC_APP_URL||`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL||'poppygram.vercel.app'}/app`;
 import {
   upsertUser,getBalance,isOwner,isAdmin,addAdmin,removeAdmin,listAdmins,rememberAdminChat,setManualVerification,clearAdminCacheFor,
   addProductFromMessage,listProducts,getProduct,deleteProduct,restoreProduct,setProductPrice,
@@ -44,6 +48,7 @@ ${DIV}
 👤 /profile — ${F('View your profile, credits and account status')}
 🗑️ /deleteaccount — ${F('Delete bot memory only; server account remains')}
 🔐 /auth — ${F('Add your Telegram account')}
+🌐 /weblogin — ${F('Get a one-time code to log in to the web app')}
 🆘 /support — ${F('Contact PoppyGram support')}
 💎 /credits — ${F('Project credits and developer')}
 🚫 /cancel — ${F('Cancel the current process')}
@@ -415,7 +420,7 @@ async function handleMessage(msg:any):Promise<{text:string;buttons?:any[][];phot
   if(cmd.startsWith('/') && cmd!=='/cancel' && cmd!=='/addfile'){
     await clearAllFlows(chatId,u.id);
   }
-  if(cmd==='/start')return {text:GREETING,buttons:[[ {text:'🛍️ Store',callback_data:'store'}, {text:'💳 Balance',callback_data:'balance'} ],[ {text:'📖 Help',callback_data:'help'}, {text:'🔐 Verify',callback_data:'auth'} ],[ {text:'🆘 Support',url:SUPPORT_URL}, {text:'💎 Credits',callback_data:'credits'} ],[ {text:'🌐 Web App',web_app:{url:'https://poppygram.vercel.app/app'}}]]};
+  if(cmd==='/start')return {text:GREETING,buttons:[[ {text:'🛍️ Store',callback_data:'store'}, {text:'💳 Balance',callback_data:'balance'} ],[ {text:'📖 Help',callback_data:'help'}, {text:'🔐 Verify',callback_data:'auth'} ],[ {text:'🆘 Support',url:SUPPORT_URL}, {text:'💎 Credits',callback_data:'credits'} ],[ {text:'🌐 Web App',web_app:{url:APP_URL}}]]};
   if(cmd==='/help')return {text:HELP,buttons:[[ {text:'🛍️ Open Store',callback_data:'store'} ],[ {text:'💳 My Balance',callback_data:'balance'} ],[ {text:'🆘 Support',callback_data:'support'}, {text:'💎 Credits',callback_data:'credits'} ]]};
   if(cmd==='/support'||cmd==='/contact'){
     return {text:supportMessage(u.id),buttons:[[ {text:`🆘 Chat with @${SUPPORT_BOT}`,url:SUPPORT_URL} ],[ {text:'🛍️ Open Store',callback_data:'store'}, {text:'💎 Credits',callback_data:'credits'} ]]};
@@ -436,6 +441,19 @@ async function handleMessage(msg:any):Promise<{text:string;buttons?:any[][];phot
     // Entering upload mode cancels auth and vice versa — never mix the two.
     await clearUploadPending(chatId,u.id);
     return {text:await startAuth(chatId,msg?.chat?.type)};
+  }
+  if(cmd==='/weblogin'){
+    if(!privateChat) return {text:`🔒 <b>${F('PRIVATE CHAT ONLY')}</b>\n\n<i>${F('Please open a direct chat with the bot and run /weblogin there.')}</i> 🛡️`};
+    try{
+      const { password } = await generateWebLoginPass(u.id);
+      return {
+        text: `🌐 <b>${F('WEB APP LOGIN')}</b> 🌐\n\n${DIV}\n\n🆔 <b>${F('Telegram ID:')}</b> <code>${u.id}</code>\n🔑 <b>${F('Secret Code:')}</b> <code>${password}</code>\n\n${DIV}\n\n📱 <i>${F('Enter this Telegram ID and Secret Code in the PoppyGram Web App')}</i>\n⏳ <i>${F('This secret code is valid for 15 minutes and can be used once.')}</i>\n\n🚫 <i>${F('Never share this secret code with anyone.')}</i>`,
+        buttons: [[{text:'🌐 Open Web App', url: APP_URL}]]
+      };
+    }catch(e:any){
+      console.error('[weblogin]',e);
+      return {text:`❌ <b>${F('LOGIN CODE FAILED')}</b>\n\n<i>${F('Could not create a login code right now. Please try again in a moment.')}</i>`};
+    }
   }
   if(cmd==='/store'){
     const products=await listProducts();
