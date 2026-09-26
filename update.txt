@@ -793,6 +793,30 @@ Pushed with: git add -A, git commit, git push origin main
   Remaining step for the owner: re-register the Telegram webhook with the
   secret (curl above), then message @poppygramsupportbot to confirm a reply.
 
+==============================================================================
+PART E - WEBHOOK SECRET ROTATION + LIVE VERIFY (2026-09-26)
+==============================================================================
+  The old SUPPORT_BOT_WEBHOOK_SECRET value was replaced (it had been pasted
+  in chat next to the leaked token, so treated as compromised):
+    vercel env rm SUPPORT_BOT_WEBHOOK_SECRET production --yes
+    <fresh 64-hex secret> | vercel env add SUPPORT_BOT_WEBHOOK_SECRET
+      production --sensitive
+  SUPPORT_BOT_TOKEN was left as-is (owner chose to keep the current token;
+  rotation in BotFather /revoke still recommended because the old token is
+  in git history).
+  Secrets were passed via stdin pipe only - never written to disk, never
+  committed, never printed. No token or secret appears in this file.
+  Then: setWebhook with the new secret -> {"ok":true,"result":true,
+    "description":"Webhook was set"}
+  Then: vercel --prod --yes -> poppygram-lp4h23qkf, Ready in 1m, aliased to
+    https://poppygram.vercel.app
+  getWebhookInfo confirms: url=https://poppygram.vercel.app/api/support,
+    pending_update_count=0, allowed_updates=[message, callback_query].
+  getMe confirms: id=8679664842, username=poppygramsupportbot.
+  Live probes after redeploy: POST /api/support (no secret) -> 403,
+    GET / -> 200.
+  Owner test: send /start to @poppygramsupportbot on Telegram.
+
 
 
 
