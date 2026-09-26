@@ -783,6 +783,16 @@ Pushed with: git add -A, git commit, git push origin main
   Verify: `vercel ls`, open https://poppygram.vercel.app, and check the
   support bot replies on Telegram.
 
+  VERIFIED LIVE (2026-09-26, deployment poppygram-hwhzjllsm, Ready in 59s):
+    GET  /                    -> 200 (login screen)
+    POST /api/bot (no secret) -> 403 (handler rejects, not the gate)
+    POST /api/support (no secret) -> 403 (Python webhook secret check live)
+    GET  /api/accounts (no admin cookie) -> 401
+    GET  /botlogin?t=x        -> 200 (public for Telegram users)
+    GET  /api/web/faq         -> 200
+  Remaining step for the owner: re-register the Telegram webhook with the
+  secret (curl above), then message @poppygramsupportbot to confirm a reply.
+
 
 
 
