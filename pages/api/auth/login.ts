@@ -5,6 +5,11 @@ const WINDOW_MS=5*60*1000; // 5 minutes
 
 function isRateLimited(ip:string):boolean{
   const now=Date.now();
+  // Prune stale records: without this the map grows for the lifetime of a warm
+  // serverless instance (one entry per attacking IP).
+  if(attemptTracker.size>500){
+    for(const [key,value] of attemptTracker){if(now-value.first>WINDOW_MS)attemptTracker.delete(key);}
+  }
   const rec=attemptTracker.get(ip);
   if(!rec){attemptTracker.set(ip,{count:1,first:now});return false;}
   if(now-rec.first>WINDOW_MS){attemptTracker.set(ip,{count:1,first:now});return false;}

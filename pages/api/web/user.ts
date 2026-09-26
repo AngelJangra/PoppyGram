@@ -1,7 +1,9 @@
-﻿// GET /api/web/user?id=N
-// Public endpoint: user balance, profile, and free-credits eligibility.
+// GET /api/web/user?id=N
+// Authenticated user endpoint: balance, profile and free-credits eligibility.
+// Requires the signed wa_session cookie to match the requested Telegram ID.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getBalance, freeCreditsStatus } from "../../../lib/storeFlow";
+import { requireWebUser } from "../../../lib/webappAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -12,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!tgId) {
       return res.status(400).json({ error: "Telegram user id required" });
     }
+    if (!requireWebUser(req, res, tgId)) return;
     const balance = await getBalance(tgId);
     const status = await freeCreditsStatus(tgId);
     const now = Date.now();
@@ -27,7 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       username: status?.username || "",
       first_name: status?.first_name || "",
       last_name: status?.last_name || "",
-      credit: status?.unlimited ? Infinity : Number(balance),
+      // JSON has no Infinity; unlimited accounts use the `unlimited` flag.
+      credit: status?.unlimited ? null : Number(balance) || 0,
       auth_verified: Boolean(status?.auth_verified),
       unlimited: Boolean(status?.unlimited),
       can_claim_freecredits: canClaim,

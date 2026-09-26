@@ -1,6 +1,6 @@
-﻿// GET /api/web/products?q=optional_search
+// GET /api/web/products?q=optional_search
 // Public endpoint: lists all active store products with photo IDs.
-// No admin auth required â€” for the user-facing web store.
+// No admin auth required — for the user-facing web store.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { db } from "../../../lib/db";
 import { getProductPhotoMap } from "../../../lib/storeFlow";

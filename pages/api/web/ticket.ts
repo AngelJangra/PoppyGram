@@ -1,9 +1,11 @@
-﻿// GET  /api/web/ticket?id=N    â€” list a user's support tickets
-// POST /api/web/ticket          â€” create a new support ticket (with optional first message)
-// Public endpoint: identifies users by their Telegram user_id.
+// GET  /api/web/ticket?id=N    — list a user's support tickets
+// POST /api/web/ticket          — create a new support ticket (with optional first message)
+// Authenticated endpoint: identifies users by their Telegram user_id, which must
+// match the signed wa_session cookie set by /api/web/login.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { db } from "../../../lib/db";
 import { sendMessage } from "../../../lib/bot";
+import { requireWebUser } from "../../../lib/webappAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
@@ -11,6 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!tgId) {
       return res.status(400).json({ error: "Telegram user id required" });
     }
+    if (!requireWebUser(req, res, tgId)) return;
     const { data, error } = await db
       .from("support_tickets")
       .select("id,kind,subject,status,assigned_to,tg_user_id,username,priority,created_at,updated_at")
@@ -30,6 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!subject) {
       return res.status(400).json({ error: "subject required" });
     }
+    if (!requireWebUser(req, res, id)) return;
     const { data, error } = await db
       .from("support_tickets")
       .insert({
@@ -58,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       await sendMessage(
         Number(id),
-        `ðŸ†• A new support ticket has been created from the web.\n\nðŸ“‹ Ticket #${data.id}: ${subject}\n\nA support manager will reply shortly.`,
+        `🆕 A new support ticket has been created from the web.\n\n📋 Ticket #${data.id}: ${subject}\n\nA support manager will reply shortly.`,
       );
     } catch {}
 

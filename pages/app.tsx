@@ -541,7 +541,7 @@ export default function WebApp() {
   };
 
   return (
-    <div className="sp-page-wrapper wa-app">
+    <div className="wa-app">
             <WebAppHeader user={user} botUsername={botUsername} onLogout={handleLogout} />
 
       {!user && (
@@ -572,8 +572,10 @@ export default function WebApp() {
           {error && <div className="wa-error-banner">{error}</div>}
 
           <main className="wa-main">
+            {/* `loading` is the real fetch state — `!products.length` made an
+                empty store show "Loading products…" forever. */}
             {activeTab === "store" && (
-              <StoreTab products={products} loading={!products.length} onBuy={handleBuy} />
+              <StoreTab products={products} loading={loading} onBuy={handleBuy} />
             )}
             {activeTab === "purchases" && <PurchasesTab purchases={purchases} />}
             {activeTab === "support" && (

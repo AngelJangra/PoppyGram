@@ -1,7 +1,9 @@
-﻿// GET /api/web/history?id=N
-// Public endpoint: user purchase history (joins store_products for names).
+// GET /api/web/history?id=N
+// Authenticated user endpoint: purchase history (joins store_products for names).
+// Requires the signed wa_session cookie to match the requested Telegram ID.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { db } from "../../../lib/db";
+import { requireWebUser } from "../../../lib/webappAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -12,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!tgId) {
       return res.status(400).json({ error: "Telegram user id required" });
     }
+    if (!requireWebUser(req, res, tgId)) return;
     const { data, error } = await db
       .from("store_purchases")
       .select("id,product_id,price,created_at,store_products!inner(name,file_name,price,description)")

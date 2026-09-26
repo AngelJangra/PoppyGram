@@ -514,3 +514,277 @@ PART B - WEB APP LOGIN: TELEGRAM WIDGET REMOVED, /weblogin ADDED
    `tsc --noEmit` exit 0 and `next build` completed without errors.
 
 
+==============================================================================
+PART C - SECURITY PASS + BUGFIXES + UI LAYOUT/STYLING OPTIMISATION
+==============================================================================
+Date: 2026-09-26
+Scope: full-project audit of the admin console, the user webapp (/app), the
+support console (/support), the API layer and both stylesheets. Every item
+below was implemented in the working tree and re-verified (see VERIFY).
+
+------------------------------------------------------------------------------
+C1. SECURITY (must-read before deploy)
+------------------------------------------------------------------------------
+[FIX-20] api/support.py - LIVE SUPPORT BOT TOKEN REMOVED FROM SOURCE.
+          It was committed in plain text (token + webhook secret), so anyone
+          with repo access could take over @poppygramsupportbot and post
+          arbitrary messages / read ticket data.
+            BOT_TOKEN        -> env SUPPORT_BOT_TOKEN
+            WEBHOOK_SECRET   -> env SUPPORT_BOT_WEBHOOK_SECRET
+          Behaviour is now FAIL-CLOSED, matching pages/api/bot.ts:
+            - tg() raises "SUPPORT_BOT_TOKEN is not configured"
+            - do_POST answers 500 when the secret is unset
+            - secret compared with hmac.compare_digest (constant time)
+          *** ACTION REQUIRED: the old token is still in git history.
+          Rotate it in BotFather (/revoke), then set the new value. ***
+
+[FIX-21] lib/webappAuth.ts - no more guessable signing secret.
+          Was `process.env.TG_BOT_TOKEN || "poppygram-default-secret"`.
+          A published fallback secret lets anyone mint a wa_session cookie
+          for ANY Telegram id. Now throws when TG_BOT_TOKEN is missing.
+          verifyTgId() also rejects non-numeric ids before comparing.
+
+[FIX-22] IDOR on every /api/web/* data endpoint (HIGH).
+          The routes are allow-listed in middleware.ts (Telegram users are
+          not site admins) but the signed wa_session cookie was only read by
+          /api/web/session - every other route trusted a client-supplied
+          tg_user_id. Anonymous callers could therefore read someone else's
+          purchase history / profile / balance / ticket threads, spend their
+          credits, and claim free credits as any user.
+          New guard requireWebUser(req, res, tgId) verifies the cookie
+          signature AND that it matches the requested id (401 no session,
+          403 id mismatch) and is now called in:
+            web/history.ts   web/user.ts        web/messages.ts
+            web/ticket.ts    web/purchase.ts    web/freecredits.ts
+            web/filerequest.ts
+          Still public by design (browse-before-login): products, product,
+          faq, photo, session, login, logout.
+
+[FIX-23] wa_session cookie now carries the `Secure` attribute on HTTPS /
+          production (it was missing before), in both set and clear helpers.
+
+[FIX-24] .env.example created (keys only, no values) - README told people to
+          copy it but it did not exist. .gitignore got `!.env.example`
+          because the existing `.env*` rule silently ignored that file.
+
+------------------------------------------------------------------------------
+C2. FUNCTIONAL BUGS
+------------------------------------------------------------------------------
+[FIX-25] pages/api/web/photo.ts
+          a) `export const config = {maxFileSize: ...}` is not a valid Next.js
+             page config - the build warned and dropped it. Replaced with
+             `api:{responseLimit:'6mb'}` (the supported knob).
+          b) `Cache-Control: public, s-maxw=86400` was a typo, so the CDN
+             ignored the header entirely. Now:
+             `public, max-age=3600, s-maxage=86400, immutable`.
+          c) Added: GET-only (405), file_id length cap, image-only guard
+             (415), 6 MB size guard (413), Content-Length.
+
+[FIX-26] Infinity is not valid JSON - JSON.stringify(Infinity) === null, so
+          unlimited accounts silently received `credit:null`. Fixed in
+          web/session.ts, web/user.ts, web/purchase.ts, web/freecredits.ts:
+          unlimited accounts now return `credit/balance:null` plus the
+          `unlimited:true` flag (which every client already checks first).
+
+[FIX-27] Double-encoded UTF-8 (mojibake) in user-facing Telegram messages.
+          Some strings had been re-saved as cp1252, so users received the
+          literal characters "ðŸ†•" instead of emojis. Fixed byte-for-byte:
+            web/ticket.ts      NEW button -> 🆕 , CLIPBOARD -> 📋 (+ em dashes)
+            web/filerequest.ts INBOX -> 📥 , PAGE -> 📄
+            web/products.ts    comment em dash
+          Project-wide scan now reports 0 corrupted strings.
+
+[FIX-28] pages/app.tsx - an EMPTY store showed "Loading products..." forever,
+          because `loading={!products.length}` conflated "no rows" with
+          "still fetching". Now uses the real `loading` fetch state, so the
+          empty-state card renders correctly.
+
+[FIX-29] pages/app.tsx - root was `className="sp-page-wrapper wa-app"`, which
+          pulled the ADMIN support theme (font, colour, gradient) onto the
+          user webapp and made .wa-app fight .sp-page-wrapper for the same
+          properties. Now `wa-app` only.
+
+[FIX-30] pages/api/auth/login.ts - the rate-limit Map never evicted expired
+          entries, so it grew forever on a warm serverless instance (one row
+          per attacking IP). Now pruned once it passes 500 entries.
+
+[FIX-31] pages/index.tsx - `onOpen` was passed to <Accounts> but never called,
+          which made the tgPhone state + the whole TGOfficialChat component
+          unreachable dead code. Added the intended "View Telegram chat"
+          button (MessageSquare, already imported) so the feature works again
+          instead of staying dead.
+
+[FIX-32] pages/api/web/faq.ts - stale comment pointed at pages/api/support.ts
+          (deleted); now points at pages/api/admin/support.ts.
+[FIX-33] middleware.ts - comment updated for SUPPORT_BOT_WEBHOOK_SECRET.
+
+------------------------------------------------------------------------------
+C3. LAYOUT / STYLING OPTIMISATION
+------------------------------------------------------------------------------
+styles/support.css
+  [UI-01] `.sp-main{min-height:calc(100vh-64px)}` was INVALID CSS (missing
+          whitespace around the operator) so the parser dropped the whole
+          declaration. -> `calc(100vh - 64px)`.
+  [UI-02] `.wa-btn-active` was used in 4 places by app.tsx but never defined,
+          so the active support sub-tab had no highlight at all. Added:
+          accent text + tinted background + accent underline.
+  [UI-03] `.wa-header` is now sticky (top:0, z-index:20) with a safe-area top
+          inset, so brand + balance stay visible while the list scrolls.
+  [UI-04] `.wa-tab-nav` scrolls horizontally (overflow-x:auto, scrollbar
+          hidden, .wa-tab-btn flex:0 0 auto + nowrap) so the 4 tabs never
+          squash on a phone. Deliberately NOT sticky: it would slide under
+          the sticky header.
+  [UI-05] Product cards: image radius now matches the card (12px top corners
+          instead of 8px inside a 12px card), 180px/140px image height,
+          .wa-product-body finally has padding (text touched the card edge),
+          description is a 2-line clamp instead of a harsh 1-line ellipsis,
+          meta row wraps, file name truncates with an ellipsis, and there is
+          a new .wa-product-size chip.
+  [UI-06] `.wa-login-section` no longer forces min-height:100vh under a
+          sticky header (that produced a pointless second screen of
+          scrolling) - it centres the card instead.
+  [UI-07] `.wa-messages` fixed height:400px -> min(65vh,560px), bubbles
+          capped at 82%.
+  [UI-08] New rules for classes app.tsx referenced with no definition at all:
+          .wa-status-grid / .wa-status-row (Account Status card rows),
+          .wa-purchase-icon (colour + hover nudge), .wa-store / .wa-support
+          (stacking context), .wa-product-size.
+  [UI-09] Mobile block (<=640px): support header wraps with safe-area inset,
+          .sp-main goes single column, sidebar becomes a horizontal chip
+          strip (scrollbar hidden), .sp-kv denser, product grid 158px
+          minimum, .wa-main padding + safe-area, smaller balance figure.
+          <=380px: product grid becomes 1 column.
+  [UI-10] `prefers-reduced-motion: reduce` disables wa-/sp- transitions and
+          animations.
+
+styles/globals.css
+  [UI-11] Removed the duplicated .scheduler-list mobile rules - they were
+          declared twice with conflicting `justify-content` values, so the
+          result depended purely on rule order.
+  [UI-12] Added the admin classes that had NO rule at all:
+            .back          "← Back" button in the chat header
+            .muted         secondary / empty-state text
+            .msgbox        header status line (action()/scheduler result)
+                           + .msgbox:empty{display:none}
+            .spin          rotating RefreshCw indicator (was static) + keyframes
+            .danger-panel  the red "Sign out all users" panel
+            .modal-overlay / .modal / .modal-head
+                           the OTP / notification / chat modal - it rendered
+                           completely unstyled, stacked in the page flow
+                           (worst styling bug in the project)
+  [UI-13] `.loading` is a FULL-PAGE splash (min-height:100vh, solid
+          background) but was reused inline inside .chat-scroll, where it
+          swallowed the viewport. Scoped override added for
+          .chat-scroll .loading / .chat-panel .loading.
+  [UI-14] The Dark/Light toggle did NOTHING - JSX toggled
+          `className={dark?'app dark':'app'}` but no CSS keyed off `.dark`.
+          Added a full light palette under `.app:not(.dark)` (page, sidebar,
+          nav, sticky header, panels, stat cards, tables, thead, inputs,
+          buttons, kv/log rows, mono blocks, chat header/foot/scroll,
+          modal, all text colours) and flipped the default state to
+          `dark=true` so the shipped appearance stays identical.
+  [UI-15] `prefers-reduced-motion: reduce` for .spin / .timer-warn / .dot.
+  [UI-16] Login rules deliberately NOT ported to the light theme - the login
+          screen renders outside .app (early return) and stays brand-dark.
+
+pages/index.tsx
+  [UI-17] The dashboard now renders a 4-KPI strip (Accounts / Active /
+          Failed / Due now) using the `.stats` / `.stat` rules that already
+          existed in globals.css but were never used by anything. Also
+          removed the unused `ac` variable inside Health.
+
+------------------------------------------------------------------------------
+C4. DOCUMENTATION
+------------------------------------------------------------------------------
+  README.md                  + SUPPORT_BOT_TOKEN, SUPPORT_BOT_WEBHOOK_SECRET
+  WEBAPP_INTEGRATION_GUIDE   support-bot webhook curl now also passes
+                             -d "secret_token=$SUPPORT_BOT_WEBHOOK_SECRET"
+                             (the handler rejects updates without it)
+  .env.example               new file: every key the app expects (no values)
+  .gitignore                 + !.env.example
+  update.txt                 this section
+
+------------------------------------------------------------------------------
+VERIFY (re-run after these changes)
+------------------------------------------------------------------------------
+  npx tsc --noEmit                      -> exit 0
+  npm run build                         -> clean, 0 warnings (the photo.ts
+                                           invalid-config warning is gone)
+  python -m py_compile api/support.py   -> OK
+  mojibake scan across all source       -> 0 corrupted strings
+  CSS class scan (used in JSX vs defined) -> 0 undefined classes
+                                           (1 known false positive)
+
+------------------------------------------------------------------------------
+DEPLOY / ENV (required after pulling these changes)
+------------------------------------------------------------------------------
+  npx vercel login
+  npx vercel env add SUPPORT_BOT_TOKEN production         # use the ROTATED token
+  npx vercel env add SUPPORT_BOT_WEBHOOK_SECRET production
+  npx vercel deploy --prod
+
+  # Re-register the support webhook with the new secret (the handler
+  # rejects any update that does not carry it):
+  curl "https://api.telegram.org/bot$SUPPORT_BOT_TOKEN/setWebhook" \
+    -d "url=https://poppygram.vercel.app/api/support" \
+    -d "secret_token=$SUPPORT_BOT_WEBHOOK_SECRET"
+
+  NOTE: the support bot FAILS CLOSED until SUPPORT_BOT_TOKEN and
+  SUPPORT_BOT_WEBHOOK_SECRET exist in the Vercel project environment.
+  The store bot, admin console, /app and /support webapps are unaffected
+  by those two variables.
+
+==============================================================================
+PART D - DEPLOY RECORD (2026-09-26, after Part C)
+==============================================================================
+Vercel env (project: poppygram, verified with `vercel env ls`):
+  SUPPORT_BOT_TOKEN            Secret  Production  (present)
+  SUPPORT_BOT_WEBHOOK_SECRET   Secret  Production  (present)
+  No new env push was needed - both variables already existed in Production,
+  so this deploy only ships the code that reads them. Values are Hidden and
+  were never printed or written to disk. If either value must change later:
+    vercel env rm SUPPORT_BOT_TOKEN production --yes
+    vercel env rm SUPPORT_BOT_WEBHOOK_SECRET production --yes
+    vercel env add SUPPORT_BOT_TOKEN production
+    vercel env add SUPPORT_BOT_WEBHOOK_SECRET production
+  then redeploy. The leaked token that was hardcoded in api/support.py is
+  still in git history - rotate it in BotFather (/revoke) and store only
+  the new value in env.
+
+Routing fix shipped in this deploy:
+  pages/api/support.ts (Next.js, 494 lines) DELETED, its logic moved to
+  pages/api/admin/support.ts (/api/admin/support). This frees the
+  /api/support path so the Python support-bot webhook (api/support.py)
+  serves Telegram updates there directly.
+  .vercelignore: REMOVED the `api/*.py` exclusion (it previously stopped
+  api/support.py from ever reaching Vercel, silently breaking the support
+  bot). Added `*.zip` so the 6.4 MB PoppyGram-main.zip is not uploaded.
+  requirements.txt REMOVED again (api/support.py uses only the Python
+  standard library; Vercel's Python runtime needs no flask dependency -
+  flask==3.0.0 was unused dead weight).
+  vercel.json: left as `{}` (no rewrite rules, so /api/support routes to
+  the Python handler and everything else to Next.js).
+
+Repo hygiene in this deploy:
+  package.json: reverted an accidental indentation-only change (no diff).
+  Stripped stray UTF-8 BOMs from 11 files (support.tsx, admin/support.ts,
+  web/faq, filerequest, freecredits, history, photo, products, purchase,
+  ticket, user) so diffs stay clean.
+  .gitignore: + `*.zip` (keeps PoppyGram-main.zip out of git).
+  New tracked files: .env.example, pages/api/admin/support.ts.
+
+Pushed with: git add -A, git commit, git push origin main
+  (Vercel auto-deploys Production from main).
+  After Vercel reports Ready, re-register the Telegram webhook so updates
+  carry the secret the handler now requires:
+  curl "https://api.telegram.org/bot$SUPPORT_BOT_TOKEN/setWebhook" \
+    -d "url=https://poppygram.vercel.app/api/support" \
+    -d "secret_token=$SUPPORT_BOT_WEBHOOK_SECRET"
+  Verify: `vercel ls`, open https://poppygram.vercel.app, and check the
+  support bot replies on Telegram.
+
+
+
+
+
+

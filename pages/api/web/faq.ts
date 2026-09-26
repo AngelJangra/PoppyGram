@@ -1,6 +1,6 @@
-﻿// GET /api/web/faq
+// GET /api/web/faq
 // Public endpoint: returns the support FAQ from the settings table, with
-// a hardcoded fallback (same logic as pages/api/support.ts -> getFaq).
+// a hardcoded fallback (same logic as pages/api/admin/support.ts -> getFaq).
 import type { NextApiRequest, NextApiResponse } from "next";
 import { db } from "../../../lib/db";
 import { PROJECT_NAME, GITHUB_USERNAME } from "../../../lib/credits";

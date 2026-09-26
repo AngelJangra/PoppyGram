@@ -66,6 +66,8 @@ See `.env.example`. Important values include:
 - `ADMIN_PASSWORD_HASH` (server-only)
 - `TG_BOT_TOKEN` (server-only)
 - `TG_BOT_WEBHOOK_SECRET` (server-only)
+- `SUPPORT_BOT_TOKEN` (server-only; support bot `@poppygramsupportbot`)
+- `SUPPORT_BOT_WEBHOOK_SECRET` (server-only; secret checked on `POST /api/support`)
 - `TG_OWNER_CHAT_ID` (server-only; Telegram numeric chat/user ID that should receive new-auth announcements)
 - `SITE_URL` (recommended production URL; used for the Telegram webhook)
 

@@ -1,16 +1,23 @@
-﻿// ---------------------------------------------------------------------------
-// Support webapp API
+// ---------------------------------------------------------------------------
+// Support webapp API (admin console)
 // Exposes store-side support features over the SAME Supabase database the bot uses.
 // Reuses the existing admin_session cookie (lib/adminAuth.ts) for auth.
-//   GET  /api/support?faq=1  -> read-only FAQ (any visitor)
-//   GET  /api/support?tab=... -> list (admin)
-//   POST /api/support {action} -> mutate (admin)
+//
+// IMPORTANT: This file lives at /api/admin/support — NOT /api/support.
+// /api/support is the Telegram SUPPORT BOT webhook (see api/support.py).
+// In Next.js, pages/api/* routes shadow root-level api/ files at the same path,
+// so this admin API was moved out of the way to let the Python webhook handler
+// serve /api/support directly from Telegram.
+//
+//   GET  /api/admin/support?faq=1  -> read-only FAQ (any visitor)
+//   GET  /api/admin/support?tab=... -> list (admin)
+//   POST /api/admin/support {action} -> mutate (admin)
 // ---------------------------------------------------------------------------
 import type { NextApiRequest, NextApiResponse } from "next";
-import { db } from "../../lib/db";
-import { requireAdmin } from "../../lib/adminAuth";
-import { sendMessage } from "../../lib/bot";
-import { PROJECT_NAME, GITHUB_USERNAME } from "../../lib/credits";
+import { db } from "../../../lib/db";
+import { requireAdmin } from "../../../lib/adminAuth";
+import { sendMessage } from "../../../lib/bot";
+import { PROJECT_NAME, GITHUB_USERNAME } from "../../../lib/credits";
 
 const DIV = "✦ ━━━━━━━━━━━━━ ✦";
 const OWNER = "drangeljangra";
@@ -305,7 +312,7 @@ async function doSetSetting(req: NextApiRequest, res: NextApiResponse) {
   const { error } = await db
     .from("settings")
     .upsert(
-      { key: v, updated_at: new Date().toISOString() },
+            { key, value: v, updated_at: new Date().toISOString() },
       { onConflict: "key" },
     );
   if (error) throw error;

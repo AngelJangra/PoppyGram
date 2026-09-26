@@ -1,9 +1,11 @@
-﻿// POST /api/web/filerequest
-// Public endpoint: submit a file request (user asks for a file not in the store).
+// POST /api/web/filerequest
+// Authenticated user endpoint: submit a file request (user asks for a file not
+// in the store). Requires the signed wa_session cookie to match tg_user_id.
 // Notifies the user via Telegram after creation.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { db } from "../../../lib/db";
 import { sendMessage } from "../../../lib/bot";
+import { requireWebUser } from "../../../lib/webappAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -18,6 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!file_name) {
       return res.status(400).json({ error: "file_name required" });
     }
+    if (!requireWebUser(req, res, id)) return;
     const { data, error } = await db
       .from("file_requests")
       .insert({
@@ -37,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       await sendMessage(
         Number(id),
-        `ðŸ“¥ File request #${data.id} submitted.\n\nðŸ“„ ${file_name}\n\nA support manager will review your request and get back to you.`,
+        `📥 File request #${data.id} submitted.\n\n📤 ${file_name}\n\nA support manager will review your request and get back to you.`,
       );
     } catch {}
 

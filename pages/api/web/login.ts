@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Fetch or ensure user profile exists in bot_users
       const { data: userRow } = await db.from("bot_users").select("tg_user_id, username, first_name, last_name").eq("tg_user_id", uid).maybeSingle();
 
-      setSessionCookie(res, uid);
+      setSessionCookie(res, uid, req);
 
       return res.status(200).json({
         ok: true,
@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(401).json({ error: "Login data expired" });
       }
 
-      setSessionCookie(res, String(id));
+      setSessionCookie(res, String(id), req);
 
       return res.status(200).json({
         ok: true,

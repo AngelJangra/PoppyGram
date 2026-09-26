@@ -79,17 +79,15 @@ function KV(p: { label: string; value: number | string | object }) {
   );
 }
 
-function Header() {
+function Header({ botUsername }: { botUsername: string }) {
   return (
     <header className="sp-header">
       <div className="sp-logo">
         <img src="/poppygram.png" alt="PoppyGram" /> PoppyGram
       </div>
       <nav className="sp-nav">
-        <a href="https://t.me/poppygram" target="_blank" rel="noopener">
-          Main bot
-        </a>
-        <a
+                <a href={`https://t.me/${botUsername || "poppygram"}`}>Main bot</a>
+                <a
           href="https://t.me/poppygramsupportbot"
           target="_blank"
           rel="noopener"
@@ -116,7 +114,7 @@ function StatsView() {
   const [stats, setStats] = useState<any>(null);
   const [err, setErr] = useState("");
   useEffect(() => {
-    api("/api/support?tab=stats")
+    api("/api/admin/support?tab=stats")
       .then((d) => setStats(d.stats))
       .catch((e) => setErr(String(e?.message)));
   }, []);
@@ -138,7 +136,7 @@ function TicketsView() {
   const [list, setList] = useState<Ticket[]>([]);
   const [err, setErr] = useState("");
   useEffect(() => {
-    api("/api/support?tab=tickets")
+    api("/api/admin/support?tab=tickets")
       .then((d) => setList(d.tickets || []))
       .catch((e) => setErr(String(e?.message)));
   }, []);
@@ -197,7 +195,7 @@ function RequestsView() {
   const [list, setList] = useState<FileReq[]>([]);
   const [err, setErr] = useState("");
   useEffect(() => {
-    api("/api/support?tab=requests")
+    api("/api/admin/support?tab=requests")
       .then((d) => setList(d.requests || []))
       .catch((e) => setErr(String(e?.message)));
   }, []);
@@ -250,7 +248,7 @@ function FeedbackView() {
   const [list, setList] = useState<FeedItem[]>([]);
   const [err, setErr] = useState("");
   useEffect(() => {
-    api("/api/support?tab=feedback")
+    api("/api/admin/support?tab=feedback")
       .then((d) => setList(d.feedback || []))
       .catch((e) => setErr(String(e?.message)));
   }, []);
@@ -305,14 +303,14 @@ function StaffView() {
   const [err, setErr] = useState("");
   const [newU, setNewU] = useState("");
   const load = () => {
-    api("/api/support?tab=staff")
+    api("/api/admin/support?tab=staff")
       .then((d) => setStaff(d.staff || []))
       .catch(setErr);
   };
   useEffect(load, []);
   const toggle = async (a: BotAdmin) => {
     try {
-      await api("/api/support", {
+      await api("/api/admin/support", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -329,7 +327,7 @@ function StaffView() {
   const add = async () => {
     if (!newU.trim()) return;
     try {
-      await api("/api/support", {
+      await api("/api/admin/support", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -403,7 +401,7 @@ function SettingsView() {
   const [k, setK] = useState("");
   const [v, setV] = useState("");
   const load = () => {
-    api("/api/support?tab=settings")
+    api("/api/admin/support?tab=settings")
       .then((d: any) => {
         const m: Record<string, string> = {};
         for (const s of d.settings || []) m[s.key] = s.value;
@@ -415,7 +413,7 @@ function SettingsView() {
   const save = async () => {
     if (!k.trim()) return;
     try {
-      await api("/api/support", {
+      await api("/api/admin/support", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -468,10 +466,14 @@ function SettingsView() {
 
 export default function Support() {
   const [tab, setTab] = useState<Tab>("stats");
+  const [botUsername, setBotUsername] = useState("");
+  useEffect(() => {
+    fetch("/api/web/session").then((r) => r.json()).then((d) => setBotUsername(d.bot_username || "")).catch(() => {});
+  }, []);
   return (
     <div className="sp-page-wrapper">
       <>
-        <Header />
+                <Header botUsername={botUsername} />
         <main className="sp-main">
           <aside className="sp-sidebar">
             <button

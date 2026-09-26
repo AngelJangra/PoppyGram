@@ -124,8 +124,9 @@ button{touch-action:manipulation}
   .account-list .tr small{font-size:11px;overflow-wrap:anywhere}
   .account-list .act{justify-content:flex-end;gap:7px}
   .account-list .act .icon{min-width:42px;min-height:42px;padding:9px;border-radius:9px}
-  .scheduler-list .tr>span:nth-child(5){grid-area:actions;display:flex;justify-content:flex-end;padding-top:10px;border-top:1px solid #241a31;font-size:12px}
-  .scheduler-list .tr>span:nth-child(5)::before{content:'Failures';margin-right:auto;color:#81768d;font-size:10px;text-transform:uppercase}
+  /* NOTE: the scheduler "Failures" cell rules are declared once, below, in the
+     .scheduler-list block. They used to be duplicated here with a conflicting
+     justify-content value, so the cascade depended on rule order. */
 }
 @media(max-width:390px){
   .toolbar{grid-template-columns:1fr}
@@ -167,3 +168,80 @@ button{touch-action:manipulation}
 @media(max-width:520px){.hard-reset-flow,.hard-reset-chat{padding:12px}.stepper span{font-size:9px}.reset-actions{display:grid;grid-template-columns:1fr}.reset-actions button{width:100%;min-height:44px}}
 .chat-mini-head{display:flex;align-items:center;gap:10px;margin:8px 0 10px;padding:9px 10px;border:1px solid #2b2040;border-radius:10px;background:#160e22}.chat-mini-head>div{display:flex;flex-direction:column;min-width:0;flex:1}.chat-mini-head b{font-size:13px;color:#eee}.chat-mini-head small{font-size:10px;color:#887d96;margin-top:2px}.chat-mini-head .button{white-space:nowrap}.hard-reset-mini-scroll{min-height:280px;max-height:420px}
 @media(max-width:520px){.chat-mini-head{align-items:flex-start;flex-wrap:wrap}.chat-mini-head .button{width:100%}.hard-reset-mini-scroll{min-height:220px;max-height:360px}}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MISSING RULES + LIGHT THEME
+   Appended so later declarations win over the dark defaults above.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Classes referenced by pages/index.tsx that had no definition at all ── */
+.back{border:1px solid #302441;background:#181022;color:#cfc6dd;padding:7px 14px;border-radius:9px;cursor:pointer;font-size:12.5px}
+.back:hover{background:#241736;color:#fff}
+.muted{color:#82788e;font-size:13px;line-height:1.6}
+/* Header status line (action()/scheduler result). Hidden while empty. */
+.msgbox{max-width:40%;font-size:12.5px;text-align:right;color:#a9a0b7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msgbox:empty{display:none}
+.spin{animation:pg-spin 1s linear infinite}
+@keyframes pg-spin{to{transform:rotate(360deg)}}
+.danger-panel{border-color:#4a2532}
+.danger-panel h3{color:#fca5a5}
+
+/* Admin modals: none of these three classes existed, so the notification /
+   OTP / chat modal rendered unstyled, stacked in the page flow. */
+.modal-overlay{position:fixed;inset:0;z-index:60;background:#05030be0;backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{width:min(680px,100%);max-height:86vh;overflow:auto;background:#151021;border:1px solid #281d39;border-radius:18px;box-shadow:0 30px 80px #000000a6}
+.modal-head{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:12px}
+
+/* `.loading` is a full-page splash (min-height:100vh, solid background).
+   Reused inline inside chat panels, it swallowed the viewport. */
+.chat-scroll .loading,.chat-panel .loading{min-height:0;display:block;background:transparent;color:#93889e;padding:2px 0;text-align:left}
+
+/* ── Light theme (.app without .dark) ────────────────────────────────────── */
+.app:not(.dark){background:#f4f2f8;color:#1c1526}
+.app:not(.dark) aside{background:#ffffff;border-right-color:#e4def0}
+.app:not(.dark) .brand{color:#2c1f45}
+.app:not(.dark) .nav{color:#5c5470}
+.app:not(.dark) .nav:hover,.app:not(.dark) .nav.active{background:#efe9fb;color:#241536}
+.app:not(.dark) .nav.active{box-shadow:inset 3px 0 #7c3aed}
+.app:not(.dark) .main header{background:#fffffff2;border-bottom-color:#e4def0}
+.app:not(.dark) .sub,.app:not(.dark) .thead{color:#6d6480}
+.app:not(.dark) .icon{background:#fff;border-color:#ded6ec;color:#3b3153}
+.app:not(.dark) .icon:hover{background:#f2eefb}
+.app:not(.dark) .stat,.app:not(.dark) .panel,.app:not(.dark) .health-card,
+.app:not(.dark) .table{background:#fff;border-color:#e4def0}
+.app:not(.dark) .stat>svg{color:#7c3aed}
+.app:not(.dark) .stat span,.app:not(.dark) .stat small,
+.app:not(.dark) .health-card span,.app:not(.dark) .status span:last-child,
+.app:not(.dark) .tr small{color:#6d6480}
+.app:not(.dark) .panel p,.app:not(.dark) .form label{color:#5f5773}
+.app:not(.dark) .status,.app:not(.dark) .kv,.app:not(.dark) .log,
+.app:not(.dark) .tr{border-color:#ece7f5}
+.app:not(.dark) .log span,.app:not(.dark) .log small{color:#6d6480}
+.app:not(.dark) .thead{background:#f7f5fc}
+.app:not(.dark) .search,.app:not(.dark) .form input{background:#fff;border-color:#ded6ec}
+.app:not(.dark) .search input,.app:not(.dark) .form input{color:#1c1526}
+.app:not(.dark) .button,.app:not(.dark) .actions button{background:#fff;border-color:#ded6ec;color:#3b3153}
+.app:not(.dark) .button:hover,.app:not(.dark) .actions button:hover{background:#f2eefb}
+.app:not(.dark) .mono{background:#f6f2ff;color:#6b21a8}
+.app:not(.dark) .danger,.app:not(.dark) .danger-panel h3{color:#b91c1c}
+.app:not(.dark) .error{color:#b91c1c}
+.app:not(.dark) .muted,.app:not(.dark) .msgbox{color:#6d6480}
+.app:not(.dark) .back{background:#fff;border-color:#ded6ec;color:#3b3153}
+.app:not(.dark) .modal{background:#fff;border-color:#e4def0;box-shadow:0 30px 80px #1c152640}
+.app:not(.dark) .chat-head{background:#fbfaff;border-bottom-color:#e4def0}
+.app:not(.dark) .chat-peer p{color:#6d6480}
+.app:not(.dark) .chat-verified{color:#0284c7}
+.app:not(.dark) .chat-foot{border-top-color:#e4def0;color:#6d6480}
+.app:not(.dark) .chat-scroll{background:radial-gradient(circle at 20% 10%,#f4efff,#fbfaff)}
+.app:not(.dark) .loading{background:#f4f2f8;color:#5f5773}
+/* `.login`/`.login-card` are deliberately excluded: the login screen renders
+   outside .app (early return before the shell), so it stays brand-dark. */
+.app:not(.dark) .chat-mini-head{background:#fbfaff;border-color:#e4def0}
+.app:not(.dark) .chat-mini-head b{color:#1c1526}
+.app:not(.dark) .chat-mini-head small{color:#6d6480}
+
+/* Motion that is only decorative should stop when the OS asks for it. */
+@media (prefers-reduced-motion:reduce){
+  .spin,.timer-warn,.dot,.pg-bar i{animation:none!important;transition:none!important}
+}
+

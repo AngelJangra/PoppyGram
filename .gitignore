@@ -3,9 +3,11 @@ node_modules
 .env.local
 .vercel
 *.log
+*.zip
 
 .vercel
 .env*
+!.env.example
 tsconfig.tsbuildinfo
 
 __pycache__/

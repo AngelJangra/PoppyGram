@@ -3,7 +3,9 @@
 # Runs on Vercel NEXT TO the Next.js store bot: webhook mode at /api/support
 # (serverless cannot long-poll). Two Telegram bots = two webhooks, one project.
 #
-# Per project requirement the bot token is HARDCODED — no environment variable.
+# Credentials come from the environment — never source (this file is public):
+#   SUPPORT_BOT_TOKEN            — token of @poppygramsupportbot
+#   SUPPORT_BOT_WEBHOOK_SECRET   — secret_token checked on every webhook POST
 # Supabase comes from the shared project env (same as the website):
 #   NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
 # Same tables as the website: bot_users, bot_admins, settings, audit_logs.
@@ -11,11 +13,13 @@
 #   sup_ticket:{id} sup_frq:{id} sup_fb:{id} sup_state:{chat}
 #   sup_seq/sup_frid/sup_fbid (counters) sup_upd:{update_id} (idempotency)
 # ---------------------------------------------------------------------------
-import json, os, re, time, urllib.request, urllib.parse, urllib.error
+import json, os, re, time, hmac, urllib.request, urllib.parse, urllib.error
 from http.server import BaseHTTPRequestHandler
 
-BOT_TOKEN = "8679664842:AAHd6cE-c5cQRVlK8S9JUQZXAMF_CG9JeZY"
-WEBHOOK_SECRET = "poppygram-support-8679664842"
+# Both are required: an empty token makes every Telegram call fail loudly, and an
+# empty secret rejects every webhook (see do_POST) instead of trusting anyone.
+BOT_TOKEN = os.environ.get("SUPPORT_BOT_TOKEN", "")
+WEBHOOK_SECRET = os.environ.get("SUPPORT_BOT_WEBHOOK_SECRET", "")
 SUPA_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")
 SUPA_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 OWNER = "drangeljangra"
@@ -64,6 +68,8 @@ def kb(rows):
 
 # --- Telegram --------------------------------------------------------------
 def tg(method, payload=None, timeout=12):
+    if not BOT_TOKEN:
+        raise RuntimeError("SUPPORT_BOT_TOKEN is not configured")
     req = urllib.request.Request(
         "https://api.telegram.org/bot%s/%s" % (BOT_TOKEN, method),
         data=json.dumps(payload or {}).encode(),
@@ -1085,8 +1091,13 @@ class handler(BaseHTTPRequestHandler):
         if self.path.split("?")[0] != "/api/support":
             self._json(404, {"error": "Not found"})
             return
+        if not WEBHOOK_SECRET:
+            # Fail closed (same policy as pages/api/bot.ts): without a configured
+            # secret we cannot tell Telegram apart from an attacker.
+            self._json(500, {"error": "SUPPORT_BOT_WEBHOOK_SECRET not configured"})
+            return
         hdr = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if hdr != WEBHOOK_SECRET:
+        if not hdr or not hmac.compare_digest(hdr, WEBHOOK_SECRET):
             self._json(403, {"error": "Forbidden"})
             return
         try:

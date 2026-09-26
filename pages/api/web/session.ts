@@ -48,7 +48,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       username: status?.username || "",
       first_name: status?.first_name || "",
       last_name: status?.last_name || "",
-      credit: status?.unlimited ? Infinity : Number(balance),
+      // JSON has no Infinity: it would serialise to null and break any client
+      // doing arithmetic on `credit`. Unlimited accounts are flagged instead.
+      credit: status?.unlimited ? null : Number(balance) || 0,
       auth_verified: Boolean(status?.auth_verified),
       unlimited: Boolean(status?.unlimited),
       can_claim_freecredits: canClaim,

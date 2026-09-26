@@ -260,9 +260,10 @@ curl "https://api.telegram.org/bot$TG_BOT_TOKEN/setWebhook" \
   -d "url=https://poppygram.vercel.app/api/bot" \
   -d "secret_token=$WEBHOOK_SECRET"
 
-# Support bot webhook
+# Support bot webhook (rejects updates without this secret header)
 curl "https://api.telegram.org/bot$SUPPORT_BOT_TOKEN/setWebhook" \
-  -d "url=https://poppygram.vercel.app/api/support"
+  -d "url=https://poppygram.vercel.app/api/support" \
+  -d "secret_token=$SUPPORT_BOT_WEBHOOK_SECRET"
 ```
 
 ### Verify After Deploy
